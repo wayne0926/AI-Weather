@@ -24,9 +24,6 @@
 - 百度地图API (地理位置服务)
 
 ### 前端
-- HTML5
-- CSS3 (现代化UI设计)
-- JavaScript (原生)
 - Service Worker (PWA支持)
 - Marked.js (Markdown渲染)
 
@@ -34,7 +31,6 @@
 
 ### 环境要求
 - Python 3.11+
-- 现代浏览器（支持PWA）
 
 ### 安装步骤
 
@@ -77,7 +73,6 @@ BAIDU_MAP_SK=你的百度地图应用SK
 
 > **注意事项：**
 > - 所有API密钥都需要自行申请，免费额度通常足够个人使用
-> - 请妥善保管你的API密钥，不要将其提交到代码仓库
 > - 建议在生产环境中使用环境变量或密钥管理服务
 > - 某些API可能需要海外服务器才能访问
 
@@ -88,12 +83,6 @@ python app.py
 
 5. 访问应用：
 打开浏览器访问 `http://localhost:5000`
-
-## 📱 PWA安装
-
-1. 使用支持PWA的浏览器访问应用
-2. 等待浏览器提示"添加到主屏幕"
-3. 点击安装即可将应用添加到设备
 
 ## 🎯 使用指南
 
@@ -130,7 +119,7 @@ python app.py
 
 MIT License
 
-## 🙏 鸣谢
+## 鸣谢
 
 - [MeteoBule](https://www.meteoblue.com/)：天气数据支持
 - [WAQI](https://waqi.info/)：空气质量数据支持
