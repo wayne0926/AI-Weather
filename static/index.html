@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 天气助手</title>
+    <meta name="theme-color" content="#4a90e2">
+    <meta name="description" content="An intelligent weather assistant powered by AI">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Weather AI">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" href="/static/icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+</head>
+
+<body>
+    <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+        🌙
+    </button>
+    <div class="container">
+        <div class="header">
+            <div class="sparkle-icon">
+                ✨
+            </div>
+            <h1>AI 天气助手</h1>
+        </div>
+        <div class="location-info-container">
+            <div class="location-info" role="status">请输入城市名称或点击📍获取当前位置</div>
+            <div id="manualLocationContainer" class="manual-location-container">
+                <input type="text" 
+                       id="cityInput" 
+                       placeholder="请输入您所在的城市名称" 
+                       class="city-input"
+                       aria-label="城市名称输入框">
+                <button id="submitCity" class="submit-city-btn" aria-label="提交城市">
+                    ➤
+                </button>
+                <button class="get-location-btn" id="getLocationBtn" aria-label="获取位置">
+                    📍
+                </button>
+            </div>
+        </div>
+        <div class="input-controls">
+            <!-- Model Selection Radio Buttons -->
+            <div class="model-selection-container">
+                <div class="model-radio">
+                    <input type="radio" id="geminiModel" name="model" value="gemini" checked>
+                    <label for="geminiModel">Gemini</label>
+                </div>
+                <div class="model-radio">
+                    <input type="radio" id="deepseekModel" name="model" value="deepseek">
+                    <label for="deepseekModel">DeepSeek</label>
+                </div>
+            </div>
+            <div class="search-bar-container">
+                <input type="text" class="search-bar" placeholder="问点什么吧..." aria-label="搜索输入框" id="queryInput">
+                <button class="clear-search" aria-label="清除搜索" id="clearSearch">✕</button>
+                <button class="search-icon" aria-label="搜索" id="searchButton">🔍</button>
+            </div>
+            <div class="example-queries">
+                <span class="example-query" data-query="这几天适合户外单车🚴吗？" data-days="5">单车🚴</span>
+                <span class="example-query" data-query="明天穿什么衣服👗合适？" data-days="2">穿衣👗</span>
+                <span class="example-query" data-query="未来三天会下雨🌧️吗？" data-days="3">下雨🌧️</span>
+                <span class="example-query" data-query="这周适合去海边🏖️吗？" data-days="7">海边🏖️</span>
+                <span class="example-query" data-query="后天要降温🥶吗？" data-days="2">降温🥶</span>
+            </div>
+            <div class="forecast-days-control">
+                <label for="forecastDays">预测天数:</label>
+                <div class="forecast-days-slider-container">
+                    <input type="range" id="forecastDays" min="1" max="14" value="5" class="forecast-days-slider"
+                        aria-label="预测天数选择" />
+                    <span class="forecast-days-value" id="forecastDaysValue">5</span>
+                </div>
+            </div>
+        </div>
+        <!-- Add this HTML inside the container, before the response-container -->
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <span class="loading-text">正在思考中</span>
+        </div>
+        <div id="response-container" role="region" aria-live="polite">
+        </div>
+        <div id="followupSection" style="display: none;">
+            <div class="followup-question">需要进一步了解什么？</div>
+            <div class="search-bar-container">
+                <input type="text" class="search-bar" placeholder="输入追问内容..." aria-label="追问输入框" id="followupInput">
+                <button class="search-icon" aria-label="提交追问" id="submitFollowup">➤</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+
+        // 缓存天气数据并显示追问框 (Cache weather data and show followup)
+        let cachedWeatherData = null;
+
+        function showFollowup() {
+            document.getElementById('followupSection').style.display = 'block';
+            document.getElementById('followupInput').focus();
+        }
+
+        // 处理追问输入 (Handle followup input)
+        document.getElementById('followupInput').addEventListener('keypress', async function (e) {
+            if (e.key === 'Enter') {
+                const question = this.value.trim();
+                if (question && cachedWeatherData) {
+                    try {
+                        showLoading(); // Show loading animation before request
+                        const responseContainer = document.getElementById('response-container');
+                        responseContainer.innerHTML = ''; // Clear previous response
+                        const modelType = document.querySelector('input[name="model"]:checked').value; // Get selected model
+
+                        const response = await fetch('/ask_followup', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                query: question,
+                                latitude: cachedWeatherData.latitude,
+                                longitude: cachedWeatherData.longitude,
+                                forecast_days: cachedWeatherData.forecast_days,
+                                model_type: modelType // Send model_type to backend
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.ai_response) {
+                            responseContainer.innerHTML = marked.parse(data.ai_response);
+                            this.value = '';
+                            window.scrollTo({
+                                top: document.body.scrollHeight,
+                                behavior: 'smooth'
+                            });
+                        }
+                    } catch (error) {
+                        console.error('追问请求失败:', error);
+                        document.getElementById('response-container').innerHTML = '追问失败，请稍后再试';
+                    } finally {
+                        hideLoading(); // Hide loading animation after request (success or error)
+                    }
+                }
+            }
+        });
+
+        // 在原有获取天气成功的回调中添加缓存 (Add caching in the original success callback for weather retrieval)
+        async function getWeatherAdvice() {
+            try {
+                const response = await fetch('/get_weather_advice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        latitude: currentLat, // Make sure currentLat is defined or use latitude
+                        longitude: currentLon, // Make sure currentLon is defined or use longitude
+                        query: document.getElementById('queryInput').value, // Make sure queryInput id is correct or use searchBar.value
+                        model_type: document.querySelector('input[name="model"]:checked').value // Send model_type to backend
+                    })
+                });
+
+                const data = await response.json();
+                if (data.ai_response) {
+                    cachedWeatherData = data; // 缓存原始数据 (Cache original data)
+                    document.getElementById('response-container').innerHTML = marked.parse(data.ai_response); // Make sure 'result' id exists, maybe use 'response-container' instead?
+                    showFollowup();
+                }
+            } catch (error) {
+                console.error('请求失败:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            const themeToggle = document.getElementById('theme-toggle');
+            const locationInfo = document.querySelector('.location-info');
+            const reacquireLocationButton = document.getElementById('reacquire-location');
+            const searchBar = document.querySelector('.search-bar');
+            const searchButton = document.getElementById('searchButton'); // Get search button
+            const responseContainer = document.getElementById('response-container');
+            const forecastDaysInput = document.getElementById('forecastDays');
+            const forecastDaysValueDisplay = document.getElementById('forecastDaysValue');
+            const exampleQueries = document.querySelectorAll('.example-query');
+
+            let latitude;
+            let longitude;
+
+            const THEMES = {
+                LIGHT: 'light',
+                DARK: 'dark'
+            };
+
+            const LOCATION_MESSAGES = {
+                LOADING: '正在获取位置信息...',
+                IP_LOADING: '正在通过 IP 获取位置信息...',
+                DENIED: '位置信息访问被拒绝。正在尝试通过 IP 确定位置信息...',
+                ERROR: '无法获取您的位置信息。正在尝试通过 IP 确定位置信息...',
+                UNSUPPORTED: '您的浏览器不支持地理位置功能。正在尝试通过 IP 确定位置信息...'
+            };
+
+            function setTheme(theme) {
+                body.classList.toggle('dark-mode', theme === THEMES.DARK);
+                themeToggle.textContent = theme === THEMES.DARK ? '☀️' : '🌙';
+                localStorage.setItem('theme', theme);
+            }
+
+            // Simplified Theme Toggle Function
+            function toggleTheme() {
+                setTheme(body.classList.contains('dark-mode') ? THEMES.LIGHT : THEMES.DARK);
+            }
+
+            // Apply Automatic Theme on Load (using simplified setTheme)
+            function applyAutomaticTheme() {
+                const hour = new Date().getHours();
+                const theme = (hour >= 19 || hour < 7) ? THEMES.DARK : THEMES.LIGHT;
+                setTheme(theme);
+            }
+
+            let cachedLocation = {};
+            let cachedForecastDays = 5;
+
+            function showResponse(markdownText, isLoading = false) {
+                responseContainer.style.display = 'block';
+                responseContainer.innerHTML = marked.parse(markdownText);
+                document.getElementById('followupSection').style.display = 'block';
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+
+            function handleFollowup() {
+                const query = document.getElementById('followupInput').value.trim();
+                if (!query) {
+                    showResponse("请输入追问内容。");
+                    return;
+                }
+                // 使用缓存数据发起追问请求 (Use cached data to initiate followup request)
+                try {
+                    showLoading(); // Show loading animation before request
+                    showResponse('', false); // Clear previous response, set isLoading to false as loading is handled by dedicated container
+                    const modelType = document.querySelector('input[name="model"]:checked').value; // Get selected model
+                    fetch('/ask_followup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            latitude: cachedLocation.latitude,
+                            longitude: cachedLocation.longitude,
+                            forecast_days: cachedForecastDays,
+                            query: query,
+                            model_type: modelType // Send model_type for followup
+                        })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.ai_response) {
+                                showResponse(data.ai_response);
+                            } else {
+                                showResponse(data.error || '追问处理失败');
+                            }
+                        })
+                        .finally(() => {
+                            hideLoading(); // Hide loading animation after request (success or error)
+                        });
+                } catch (error) {
+                    console.error('追问请求失败:', error);
+                    showResponse(`追问失败: ${error.message}`);
+                    hideLoading(); // Hide loading animation in case of error
+                }
+            }
+
+            // 绑定追问按钮事件 (Bind followup button event)
+            document.getElementById('submitFollowup').addEventListener('click', handleFollowup);
+            document.getElementById('followupInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleFollowup();
+            });
+
+            function getLocation() {
+                locationInfo.textContent = LOCATION_MESSAGES.LOADING;
+                let retryCount = 0;
+                const MAX_RETRIES = 3;
+
+                function tryGeolocation() {
+                    if (navigator.geolocation) {
+                        const geolocationOptions = {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        };
+
+                        navigator.geolocation.getCurrentPosition(
+                            // Success callback
+                            (position) => {
+                                latitude = position.coords.latitude;
+                                longitude = position.coords.longitude;
+                                locationInfo.textContent = `您的位置： ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                                currentLat = latitude;
+                                currentLon = longitude;
+                            },
+                            // Error callback
+                            (error) => {
+                                console.error(`地理位置错误 (尝试 ${retryCount + 1}/${MAX_RETRIES}):`, error);
+                                if (retryCount < MAX_RETRIES - 1) {
+                                    retryCount++;
+                                    locationInfo.textContent = `正在重试获取位置 (${retryCount}/${MAX_RETRIES})...`;
+                                    setTimeout(tryGeolocation, 1000); // 1秒后重试
+                                } else {
+                                    locationInfo.textContent = {
+                                        [GeolocationPositionError.PERMISSION_DENIED]: LOCATION_MESSAGES.DENIED,
+                                        [GeolocationPositionError.TIMEOUT]: LOCATION_MESSAGES.ERROR,
+                                        [GeolocationPositionError.POSITION_UNAVAILABLE]: LOCATION_MESSAGES.ERROR,
+                                    }[error.code] || LOCATION_MESSAGES.ERROR;
+                                    tryIPLocation(); // 地理位置全部失败后尝试IP定位
+                                }
+                            },
+                            geolocationOptions
+                        );
+                    } else {
+                        locationInfo.textContent = LOCATION_MESSAGES.UNSUPPORTED;
+                        tryIPLocation(); // 浏览器不支持时尝试IP定位
+                    }
+                }
+
+                async function tryIPLocation() {
+                    let ipRetryCount = 0;
+                    const MAX_IP_RETRIES = 3;
+
+                    async function attemptIPLocation() {
+                        try {
+                            locationInfo.textContent = `${LOCATION_MESSAGES.IP_LOADING} (尝试 ${ipRetryCount + 1}/${MAX_IP_RETRIES})`;
+                            const response = await fetch('/get_ip_location');
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            const data = await response.json();
+
+                            if (data.latitude && data.longitude) {
+                                latitude = parseFloat(data.latitude);
+                                longitude = parseFloat(data.longitude);
+                                locationInfo.textContent = `您的位置： ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (${data.city}, ${data.province} 通过 IP)`;
+                                currentLat = latitude;
+                                currentLon = longitude;
+                                hideManualLocationInput(); // 隐藏手动输入框
+                            } else {
+                                throw new Error('IP定位返回数据无效');
+                            }
+                        } catch (error) {
+                            console.error(`IP定位错误 (尝试 ${ipRetryCount + 1}/${MAX_IP_RETRIES}):`, error);
+                            if (ipRetryCount < MAX_IP_RETRIES - 1) {
+                                ipRetryCount++;
+                                setTimeout(attemptIPLocation, 1000);
+                            } else {
+                                console.error('IP定位最终失败，显示手动输入');
+                                showManualLocationInput();
+                            }
+                        }
+                    }
+
+                    await attemptIPLocation();
+                }
+
+                // 开始定位流程
+                tryGeolocation();
+            }
+
+            async function getWeatherAIResponse(latitude, longitude, query, forecastDays) {
+                try {
+                    showLoading(); // Show loading animation before request
+                    showResponse('', false); // Clear previous response, set isLoading to false as loading is handled by dedicated container
+                    const modelType = document.querySelector('input[name="model"]:checked').value; // Get selected model
+                    const response = await fetch('/get_weather_advice', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ latitude, longitude, query, forecast_days: forecastDays, model_type: modelType })
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP 错误！状态码: ${response.status}`);
+
+                    const data = await response.json();
+                    showResponse(data.ai_response || data.error || '从服务器收到意外的响应。');
+                } catch (error) {
+                    console.error('获取天气建议时出错:', error);
+                    showResponse(`无法获取天气建议: ${error.message}`);
+                } finally {
+                    hideLoading(); // Hide loading animation after request (success or error)
+                }
+            }
+
+            function handleSearch() {
+                const query = document.getElementById('queryInput').value.trim();
+                if (!query) {
+                    showResponse("请输入一个问题。");
+                    return;
+                }
+                if (typeof latitude === 'undefined' || typeof longitude === 'undefined') {
+                    showResponse("位置信息尚未可用，请稍候。");
+                    return;
+                }
+                // 缓存位置和预测天数 (Cache location and forecast days)
+                cachedLocation = { latitude, longitude };
+                cachedForecastDays = parseInt(forecastDaysInput.value);
+                getWeatherAIResponse(latitude, longitude, query, cachedForecastDays);
+            }
+
+            // Event Listeners
+            themeToggle.addEventListener('click', toggleTheme);
+            searchButton.addEventListener('click', handleSearch); // Attach to search button
+            searchBar.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') handleSearch();
+            });
+            document.getElementById('getLocationBtn').addEventListener('click', () => {
+                // Clear any existing location info
+                locationInfo.textContent = LOCATION_MESSAGES.LOADING;
+                // Reset the location values
+                latitude = undefined;
+                longitude = undefined;
+                // Start the location process again
+                getLocation();
+            });
+
+            // Example queries event listeners (Updated)
+            exampleQueries.forEach(queryElement => {
+                queryElement.addEventListener('click', function () {
+                    searchBar.value = this.dataset.query;
+                    searchBar.focus();
+                    const days = this.dataset.days;
+                    if (days) {
+                        forecastDaysInput.value = days;
+                        forecastDaysValueDisplay.textContent = days;
+                        updateSliderBackground(forecastDaysInput);
+                    }
+                    // Add this line to show the clear button when using example queries
+                    document.getElementById('clearSearch').classList.add('visible');
+                });
+            });
+
+
+            // Initialize theme (Apply saved or automatic theme)
+            const savedTheme = localStorage.getItem('theme');
+            savedTheme ? setTheme(savedTheme) : applyAutomaticTheme();
+
+            // 初始化位置UI，但不自动获取位置
+            locationInfo.textContent = '请输入城市名称或点击📍获取当前位置';
+
+            // Forecast days slider (Slider functionality with visual update)
+            function updateSliderBackground(slider) {
+                const value = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+                slider.style.background = `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${value}%, #d3d3d3 ${value}%, #d3d3d3 100%)`;
+            }
+
+            forecastDaysInput.addEventListener('input', () => {
+                forecastDaysValueDisplay.textContent = forecastDaysInput.value;
+                updateSliderBackground(forecastDaysInput); // Update slider background on input
+            });
+            updateSliderBackground(forecastDaysInput); // Initial slider background update
+
+
+            // Add keyboard navigation
+            document.addEventListener('keydown', (e) => {
+                if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    searchBar.focus();
+                }
+            });
+
+            // Add error boundary
+            window.onerror = function (msg, url, lineNo, columnNo, error) {
+                console.error('Global error:', { msg, url, lineNo, columnNo, error });
+                showResponse('应用程序发生错误，请刷新页面重试。');
+                return false;
+            };
+
+
+            // Add analytics event tracking (optional - replace with your analytics code)
+            const trackEvent = (eventName, eventData) => {
+                if (window.gtag) {
+                    gtag('event', eventName, eventData);
+                }
+            };
+
+            // Add accessibility improvements
+            const improveAccessibility = () => {
+                // Add ARIA labels - already in place, can add more if needed
+            };
+
+            improveAccessibility();
+
+            // Lazy load response container (Intersection Observer)
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1'; // Or any other lazy load effect
+                        observer.unobserve(entry.target); // Optionally unobserve after loading
+                    }
+                });
+            });
+
+            if (responseContainer) {
+                responseContainer.style.opacity = '0'; // Initially hide or style for lazy load
+                observer.observe(responseContainer);
+            }
+
+            // Prefers reduced motion
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.documentElement.style.setProperty('--transition-speed', '0s');
+            }
+
+            // Add this to your existing JavaScript
+            const searchInput = document.getElementById('queryInput');
+            const clearButton = document.getElementById('clearSearch');
+
+            // Show/hide clear button based on input content
+            searchInput.addEventListener('input', () => {
+                clearButton.classList.toggle('visible', searchInput.value.length > 0);
+            });
+
+            // Clear input when clear button is clicked
+            clearButton.addEventListener('click', () => {
+                searchInput.value = '';
+                clearButton.classList.remove('visible');
+                searchInput.focus();
+            });
+
+            // 添加手动位置输入相关函数
+            function showManualLocationInput() {
+                const container = document.getElementById('manualLocationContainer');
+                if (container) {
+                    container.style.display = 'flex';
+                }
+            }
+
+            function hideManualLocationInput() {
+                const container = document.getElementById('manualLocationContainer');
+                if (container) {
+                    container.style.display = 'none';
+                }
+            }
+
+            async function handleCitySubmit() {
+                const cityInput = document.getElementById('cityInput');
+                const city = cityInput.value.trim();
+                
+                if (!city) {
+                    locationInfo.textContent = '请输入城市名称';
+                    return;
+                }
+
+                try {
+                    locationInfo.textContent = '正在获取城市位置信息...';
+                    const response = await fetch('/get_city_location', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ city: city })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    latitude = parseFloat(data.latitude);
+                    longitude = parseFloat(data.longitude);
+                    currentLat = latitude;
+                    currentLon = longitude;
+                    
+                    locationInfo.textContent = `您的位置： ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (${city})`;
+                    cityInput.value = ''; // 清空输入框，方便下次输入
+                } catch (error) {
+                    console.error('获取城市位置失败:', error);
+                    locationInfo.textContent = `无法获取城市"${city}"的位置信息，请重试或输入其他城市`;
+                }
+            }
+
+            // 添加城市提交相关的事件监听
+            document.getElementById('submitCity').addEventListener('click', handleCitySubmit);
+            document.getElementById('cityInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleCitySubmit();
+            });
+            document.getElementById('getLocationBtn').addEventListener('click', getLocation);
+        });
+
+        // Add to existing scripts
+
+        function showLoading() {
+            document.querySelector('.loading-container').style.display = 'flex';
+            document.getElementById('response-container').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.querySelector('.loading-container').style.display = 'none';
+            document.getElementById('response-container').style.display = 'block';
+        }
+
+        // Example usage in your API call:
+        /*
+        async function handleSearch() {
+            showLoading();
+            try {
+                // Your API call here
+                await fetchResponse();
+            } finally {
+                hideLoading();
+            }
+        }
+        */
+    </script>
+</body>
+
+</html>
