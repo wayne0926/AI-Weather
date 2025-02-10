@@ -52,13 +52,34 @@ pip install -r requirements.txt
 3. 配置环境变量：
 创建 `.env` 文件并设置以下API密钥：
 ```env
+# MeteoBule API密钥 - 用于获取精确的天气预报数据
+# 获取地址：https://content.meteoblue.com/en/access/packages
 METEOBLUE_API_KEY=你的MeteoBule API密钥
+
+# WAQI API令牌 - 用于获取空气质量数据
+# 获取地址：https://aqicn.org/data-platform/token/
 WAQI_TOKEN=你的WAQI API令牌
+
+# Google Gemini API密钥 - 天气分析和建议（选项1）
+# 获取地址：https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=你的Google Gemini API密钥
+
+# DeepSeek API密钥 - 天气分析和建议（选项2）
+# 获取地址：https://platform.deepseek.com/
 DEEPSEEK_API_KEY=你的DeepSeek API密钥
+
+# 百度地图应用AK和SK - 用于IP定位和地理编码服务
+# 获取地址：https://lbsyun.baidu.com/apiconsole/key
 BAIDU_MAP_AK=你的百度地图应用AK
 BAIDU_MAP_SK=你的百度地图应用SK
-GEMINI_API_KEY=你的Google Gemini API密钥
+
 ```
+
+> **注意事项：**
+> - 所有API密钥都需要自行申请，免费额度通常足够个人使用
+> - 请妥善保管你的API密钥，不要将其提交到代码仓库
+> - 建议在生产环境中使用环境变量或密钥管理服务
+> - 某些API可能需要海外服务器才能访问
 
 4. 运行应用：
 ```bash
