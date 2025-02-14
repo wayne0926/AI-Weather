@@ -4,3 +4,9 @@ openai
 python-dotenv
 Flask-Cors
 google-genai
+fastapi==0.110.0
+uvicorn==0.27.1
+python-multipart==0.0.9
+pydantic==2.6.3
+python-jose==3.3.0
+aiohttp==3.9.3
