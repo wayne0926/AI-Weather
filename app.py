@@ -16,9 +16,13 @@ from google import genai
 import logging
 from functools import wraps
 from pathlib import Path
+import uvicorn
 
 # 配置日志
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # 初始化天气缓存字典
@@ -28,7 +32,11 @@ weather_cache: Dict[str, Any] = {}
 load_dotenv()
 
 # 创建FastAPI应用
-app = FastAPI(title="Weather AI Assistant")
+app = FastAPI(
+    title="Weather AI Assistant",
+    description="An AI-powered weather assistant API",
+    version="1.0.0",
+)
 
 # 配置CORS
 app.add_middleware(
@@ -69,23 +77,23 @@ gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 class WeatherRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
-    latitude: float
-    longitude: float
-    query: str
-    forecast_days: Optional[int] = 5
-    model_type: Optional[str] = "gemini"
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    query: str = Field(..., min_length=1)
+    forecast_days: Optional[int] = Field(5, ge=1, le=14)
+    model_type: Optional[str] = Field("gemini", pattern="^(gemini|deepseek)$")
 
 class FollowupRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
-    latitude: float
-    longitude: float
-    query: str
-    forecast_days: Optional[int] = 5
-    model_type: Optional[str] = "gemini"
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    query: str = Field(..., min_length=1)
+    forecast_days: Optional[int] = Field(5, ge=1, le=14)
+    model_type: Optional[str] = Field("gemini", pattern="^(gemini|deepseek)$")
 
 class CityRequest(BaseModel):
-    city: str
+    city: str = Field(..., min_length=1)
 
 def generate_cache_key(latitude: float, longitude: float, forecast_days: int, model_type: str) -> str:
     key_string = f"{latitude}_{longitude}_{forecast_days}_{model_type}"
@@ -301,5 +309,17 @@ async def get_city_location(request: CityRequest):
         raise HTTPException(status_code=500, detail=f"获取城市位置信息时出错: {str(e)}")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # 生产环境配置
+    uvicorn_config = uvicorn.Config(
+        "app:app",
+        host="0.0.0.0",
+        port=8000,
+        workers=4,  # 根据CPU核心数调整
+        loop="uvloop",
+        http="httptools",
+        log_level="info",
+        reload=False,  # 生产环境禁用热重载
+        access_log=True,
+    )
+    server = uvicorn.Server(uvicorn_config)
+    server.run()
