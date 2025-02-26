@@ -4,7 +4,7 @@
 
 ## ✨ 特色功能
 
-- 🤖 双AI模型支持（Gemini/DeepSeek）提供智能天气分析
+- 🤖 双AI模型支持（Gemini和DeepSeek）提供智能天气分析
 - 🧠 实时显示AI推理过程（DeepSeek模式）
 - 📍 多种定位方式（GPS/IP/城市名称）
 - 🌈 实时天气信息和空气质量数据
@@ -23,8 +23,8 @@
 - Uvicorn (高性能 ASGI 服务器)
 - Pydantic (数据验证)
 - aiohttp (异步 HTTP 客户端)
-- OpenAI API (DeepSeek)
-- Google Gemini API
+- OpenAI API (DeepSeek-R1-Distill-Qwen-32B)
+- Google Gemini API (Gemini-2.0-Flash-Thinking)
 - MeteoBule API (天气数据)
 - WAQI API (空气质量数据)
 - 百度地图API (地理位置服务)
@@ -102,12 +102,12 @@ python app.py
 
 1. **位置获取**
    - 点击📍按钮使用GPS定位
-   - 输入城市名称手动定位
+   - 输入城市名称手动定位（由 Gemini-2.0-Flash-Lite 提供地理编码服务）
    - 自动IP定位（备选方案）
 
 2. **AI模型选择**
-   - Gemini：Google的新一代AI模型
-   - DeepSeek：专业的中文AI模型，支持实时推理过程显示
+   - Gemini：Google的新一代AI模型（Gemini-2.0-Flash-Thinking）
+   - DeepSeek：专业的中文AI模型（DeepSeek-R1-Distill-Qwen-32B）
      - 选择DeepSeek模式时，可以看到AI的实时推理过程
      - 推理内容自动滚动显示，保持最新4行可见
      - 轻量化显示效果，不影响主要内容阅读
