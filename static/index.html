@@ -83,6 +83,9 @@
             <div class="loading-spinner"></div>
             <span class="loading-text">正在思考中</span>
         </div>
+        <div id="reasoning-container" class="reasoning-container">
+            <div class="reasoning-content"></div>
+        </div>
         <div id="response-container" role="region" aria-live="polite">
         </div>
         <div id="followupSection" style="display: none;">
@@ -115,45 +118,103 @@
         }
 
         // 处理追问输入 (Handle followup input)
-        document.getElementById('followupInput').addEventListener('keypress', async function (e) {
-            if (e.key === 'Enter') {
-                const question = this.value.trim();
-                if (question && cachedWeatherData) {
-                    try {
-                        showLoading(); // Show loading animation before request
-                        const responseContainer = document.getElementById('response-container');
-                        responseContainer.innerHTML = ''; // Clear previous response
-                        const modelType = document.querySelector('input[name="model"]:checked').value; // Get selected model
-
-                        const response = await fetch('/ask_followup', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                query: question,
-                                latitude: cachedWeatherData.latitude,
-                                longitude: cachedWeatherData.longitude,
-                                forecast_days: cachedWeatherData.forecast_days,
-                                model_type: modelType // Send model_type to backend
-                            })
-                        });
-
-                        const data = await response.json();
-                        if (data.ai_response) {
-                            responseContainer.innerHTML = marked.parse(data.ai_response);
-                            this.value = '';
-                            window.scrollTo({
-                                top: document.body.scrollHeight,
-                                behavior: 'smooth'
-                            });
-                        }
-                    } catch (error) {
-                        console.error('追问请求失败:', error);
-                        document.getElementById('response-container').innerHTML = '追问失败，请稍后再试';
-                    } finally {
-                        hideLoading(); // Hide loading animation after request (success or error)
-                    }
-                }
+        function handleFollowup() {
+            const query = document.getElementById('followupInput').value.trim();
+            if (!query) {
+                showResponse("请输入追问内容。");
+                return;
             }
+            if (!cachedWeatherData) {
+                showResponse("请先进行天气查询。");
+                return;
+            }
+            
+            try {
+                showLoading();
+                showResponse('', false);
+                const modelType = document.querySelector('input[name="model"]:checked').value;
+                
+                fetch('/ask_followup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: cachedWeatherData.latitude,
+                        longitude: cachedWeatherData.longitude,
+                        forecast_days: cachedWeatherData.forecast_days,
+                        query: query,
+                        model_type: modelType
+                    })
+                }).then(async response => {
+                    if (!response.ok) throw new Error(`HTTP 错误！状态码: ${response.status}`);
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let accumulatedResponse = '';
+                    let accumulatedReasoning = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            hideLoading();
+                            showFollowup();
+                            break;
+                        }
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(5);
+                                if (data === '[DONE]') {
+                                    hideLoading();
+                                    showFollowup();
+                                    break;
+                                }
+                                try {
+                                    const jsonData = JSON.parse(data);
+                                    if (jsonData.error) {
+                                        showResponse(`错误: ${jsonData.error}`);
+                                        hideLoading();
+                                        return;
+                                    }
+                                    if (jsonData.start) {
+                                        // Response stream started
+                                        continue;
+                                    }
+                                    if (jsonData.content) {
+                                        accumulatedResponse += jsonData.content;
+                                        showResponse(accumulatedResponse);
+                                    }
+                                    if (jsonData.reasoning_content) {
+                                        accumulatedReasoning += jsonData.reasoning_content;
+                                        showReasoning(accumulatedReasoning);
+                                    }
+                                } catch (e) {
+                                    console.error('解析数据出错:', e);
+                                }
+                            }
+                        }
+                    }
+                }).catch(error => {
+                    console.error('追问请求失败:', error);
+                    showResponse(`追问失败: ${error.message}`);
+                    hideLoading();
+                });
+            } catch (error) {
+                console.error('追问请求失败:', error);
+                showResponse(`追问失败: ${error.message}`);
+                hideLoading();
+            }
+        }
+
+        // Remove the old event listener and add the new one
+        document.getElementById('followupInput').removeEventListener('keypress', function (e) {
+            if (e.key === 'Enter') handleFollowup();
+        });
+
+        document.getElementById('followupInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleFollowup();
         });
 
         // 在原有获取天气成功的回调中添加缓存 (Add caching in the original success callback for weather retrieval)
@@ -233,60 +294,39 @@
             let cachedForecastDays = 5;
 
             function showResponse(markdownText, isLoading = false) {
-                responseContainer.style.display = 'block';
-                responseContainer.innerHTML = marked.parse(markdownText);
-                document.getElementById('followupSection').style.display = 'block';
-                window.scrollTo({
-                    top: document.body.scrollHeight,
-                    behavior: 'smooth'
+                const responseContainer = document.getElementById('response-container');
+                if (!responseContainer.style.display || responseContainer.style.display === 'none') {
+                    responseContainer.style.display = 'block';
+                    responseContainer.innerHTML = '';
+                }
+                
+                // 使用 marked 的词法分析器来检测是否有新的完整 Markdown 块
+                const tokens = marked.lexer(markdownText);
+                const html = marked.parser(tokens);
+                
+                // 创建一个临时容器来存放新内容
+                const tempContainer = document.createElement('div');
+                tempContainer.innerHTML = html;
+                
+                // 如果有内容，立即隐藏加载提示
+                if (html.trim()) {
+                    hideLoading();
+                }
+                
+                // 平滑地更新内容
+                requestAnimationFrame(() => {
+                    responseContainer.innerHTML = tempContainer.innerHTML;
+                    
+                    // 只在内容真正增加时才滚动
+                    const shouldScroll = responseContainer.scrollHeight - responseContainer.scrollTop > responseContainer.clientHeight;
+                    if (shouldScroll) {
+                        responseContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    }
                 });
-            }
 
-            function handleFollowup() {
-                const query = document.getElementById('followupInput').value.trim();
-                if (!query) {
-                    showResponse("请输入追问内容。");
-                    return;
-                }
-                // 使用缓存数据发起追问请求 (Use cached data to initiate followup request)
-                try {
-                    showLoading(); // Show loading animation before request
-                    showResponse('', false); // Clear previous response, set isLoading to false as loading is handled by dedicated container
-                    const modelType = document.querySelector('input[name="model"]:checked').value; // Get selected model
-                    fetch('/ask_followup', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            latitude: cachedLocation.latitude,
-                            longitude: cachedLocation.longitude,
-                            forecast_days: cachedForecastDays,
-                            query: query,
-                            model_type: modelType // Send model_type for followup
-                        })
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.ai_response) {
-                                showResponse(data.ai_response);
-                            } else {
-                                showResponse(data.error || '追问处理失败');
-                            }
-                        })
-                        .finally(() => {
-                            hideLoading(); // Hide loading animation after request (success or error)
-                        });
-                } catch (error) {
-                    console.error('追问请求失败:', error);
-                    showResponse(`追问失败: ${error.message}`);
-                    hideLoading(); // Hide loading animation in case of error
-                }
+                // 显示追问部分
+                document.getElementById('followupSection').style.display = 'block';
             }
-
-            // 绑定追问按钮事件 (Bind followup button event)
-            document.getElementById('submitFollowup').addEventListener('click', handleFollowup);
-            document.getElementById('followupInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') handleFollowup();
-            });
 
             function getLocation() {
                 locationInfo.textContent = LOCATION_MESSAGES.LOADING;
@@ -378,9 +418,10 @@
 
             async function getWeatherAIResponse(latitude, longitude, query, forecastDays) {
                 try {
-                    showLoading(); // Show loading animation before request
-                    showResponse('', false); // Clear previous response, set isLoading to false as loading is handled by dedicated container
-                    const modelType = document.querySelector('input[name="model"]:checked').value; // Get selected model
+                    showLoading();
+                    showResponse('', false);
+                    const modelType = document.querySelector('input[name="model"]:checked').value;
+                    
                     const response = await fetch('/get_weather_advice', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -389,13 +430,66 @@
 
                     if (!response.ok) throw new Error(`HTTP 错误！状态码: ${response.status}`);
 
-                    const data = await response.json();
-                    showResponse(data.ai_response || data.error || '从服务器收到意外的响应。');
+                    // Update cached data for followup questions
+                    cachedWeatherData = {
+                        latitude: latitude,
+                        longitude: longitude,
+                        forecast_days: forecastDays
+                    };
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let accumulatedResponse = '';
+                    let accumulatedReasoning = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            hideLoading();
+                            showFollowup();
+                            break;
+                        }
+
+                        const chunk = decoder.decode(value);
+                        const lines = chunk.split('\n');
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(5);
+                                if (data === '[DONE]') {
+                                    hideLoading();
+                                    showFollowup();
+                                    break;
+                                }
+                                try {
+                                    const jsonData = JSON.parse(data);
+                                    if (jsonData.error) {
+                                        showResponse(`错误: ${jsonData.error}`);
+                                        hideLoading();
+                                        return;
+                                    }
+                                    if (jsonData.start) {
+                                        // Response stream started
+                                        continue;
+                                    }
+                                    if (jsonData.content) {
+                                        accumulatedResponse += jsonData.content;
+                                        showResponse(accumulatedResponse);
+                                    }
+                                    if (jsonData.reasoning_content) {
+                                        accumulatedReasoning += jsonData.reasoning_content;
+                                        showReasoning(accumulatedReasoning);
+                                    }
+                                } catch (e) {
+                                    console.error('解析数据出错:', e);
+                                }
+                            }
+                        }
+                    }
                 } catch (error) {
                     console.error('获取天气建议时出错:', error);
                     showResponse(`无法获取天气建议: ${error.message}`);
-                } finally {
-                    hideLoading(); // Hide loading animation after request (success or error)
+                    hideLoading();
                 }
             }
 
@@ -596,18 +690,48 @@
                 if (e.key === 'Enter') handleCitySubmit();
             });
             document.getElementById('getLocationBtn').addEventListener('click', getLocation);
+
+            // 绑定追问按钮事件 (Bind followup button event)
+            document.getElementById('submitFollowup').addEventListener('click', handleFollowup);
+            document.getElementById('followupInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleFollowup();
+            });
         });
 
         // Add to existing scripts
 
         function showLoading() {
-            document.querySelector('.loading-container').style.display = 'flex';
-            document.getElementById('response-container').style.display = 'none';
+            const loadingContainer = document.querySelector('.loading-container');
+            const responseContainer = document.getElementById('response-container');
+            
+            if (loadingContainer) {
+                loadingContainer.style.display = 'flex';
+                // Use a small delay to ensure the display change takes effect before the opacity transition
+                setTimeout(() => {
+                    loadingContainer.style.opacity = '1';
+                }, 10);
+            }
+            
+            if (responseContainer) {
+                responseContainer.style.opacity = '0.5';
+            }
         }
 
         function hideLoading() {
-            document.querySelector('.loading-container').style.display = 'none';
-            document.getElementById('response-container').style.display = 'block';
+            const loadingContainer = document.querySelector('.loading-container');
+            const responseContainer = document.getElementById('response-container');
+            
+            if (loadingContainer) {
+                loadingContainer.style.opacity = '0';
+                // Wait for the fade out animation to complete before hiding
+                setTimeout(() => {
+                    loadingContainer.style.display = 'none';
+                }, 300);
+            }
+            
+            if (responseContainer) {
+                responseContainer.style.opacity = '1';
+            }
         }
 
         // Example usage in your API call:
@@ -622,6 +746,75 @@
             }
         }
         */
+
+        // 添加防抖动样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .loading-container {
+                transition: opacity 0.3s ease;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 1000;
+                background: var(--background-color);
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            
+            #response-container {
+                transition: opacity 0.3s ease;
+                min-height: 100px;
+                position: relative;
+                overflow-anchor: none;
+                contain: content;
+                line-height: 1.5;
+                word-wrap: break-word;
+                opacity: 1;
+            }
+            
+            #response-container * {
+                overflow-anchor: none;
+            }
+            
+            #response-container p:last-child {
+                overflow-anchor: auto;
+            }
+            
+            .loading-spinner {
+                transition: all 0.3s ease;
+            }
+            
+            .loading-text {
+                transition: all 0.3s ease;
+            }
+        `;
+        document.head.appendChild(style);
+
+        function showReasoning(content) {
+            const reasoningContainer = document.getElementById('reasoning-container');
+            const reasoningContent = reasoningContainer.querySelector('.reasoning-content');
+            
+            if (content) {
+                reasoningContainer.style.display = 'block';
+                
+                // Keep only the last 4 lines
+                const lines = content.split('\n');
+                if (lines.length > 4) {
+                    reasoningContent.textContent = lines.slice(-4).join('\n');
+                } else {
+                    reasoningContent.textContent = content;
+                }
+
+                // Auto scroll to bottom with animation
+                requestAnimationFrame(() => {
+                    reasoningContainer.scrollTop = reasoningContainer.scrollHeight;
+                });
+            } else {
+                reasoningContainer.style.display = 'none';
+            }
+        }
     </script>
 </body>
 

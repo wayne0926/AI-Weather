@@ -1,10 +1,10 @@
 # backend.py
 from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, AsyncGenerator
 import aiohttp
 import json
 from openai import OpenAI
@@ -17,6 +17,7 @@ import logging
 from functools import wraps
 from pathlib import Path
 import uvicorn
+import asyncio
 
 # 配置日志
 logging.basicConfig(
@@ -70,7 +71,7 @@ if missing_keys:
     raise ValueError(f"Missing API keys: {', '.join(missing_keys)}. Please set them in your .env file.")
 
 # 初始化AI客户端
-deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.siliconflow.cn/v1/")
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # 请求模型
@@ -111,31 +112,31 @@ async def get_sw():
     return FileResponse("static/sw.js", media_type="application/javascript")
 
 @app.post("/get_weather_advice")
-async def get_weather_advice(request: WeatherRequest):
+async def get_weather_advice(request: Request, weather_request: WeatherRequest):
     try:
         # 添加提示语到查询
-        enhanced_query = request.query + '请直接输出回答。同时请在最开头得出我的位置以及我的位置大致的名称，如果是询问优劣、最适合类型的问题，请使用五★进行评级。必须高度充分利用Markdown语法进行结构化，日期明显易读，日期与日期之间必修使用Markdown语法分割线。必须在回答文本中使用对应emoji以提升易读性'
+        enhanced_query = weather_request.query + '请直接输出回答。同时请在最开头得出我的位置以及我的位置大致的名称，如果是询问优劣、最适合类型的问题，请使用五★进行评级。必须高度充分利用Markdown语法进行结构化，日期明显易读，日期与日期之间必修使用Markdown语法分割线。必须在回答文本中使用对应emoji以提升易读性'
         
         # 生成缓存键
         cache_key = generate_cache_key(
-            request.latitude,
-            request.longitude,
-            request.forecast_days,
-            request.model_type
+            weather_request.latitude,
+            weather_request.longitude,
+            weather_request.forecast_days,
+            weather_request.model_type
         )
 
         # 确保天数在有效范围内
-        forecast_days = max(1, min(request.forecast_days, 14))
+        forecast_days = max(1, min(weather_request.forecast_days, 14))
 
         async with aiohttp.ClientSession() as session:
             # 获取天气数据
-            weather_url = f"https://my.meteoblue.com/packages/basic-3h?apikey={METEOBLUE_API_KEY}&lat={request.latitude}&lon={request.longitude}&format=json&windspeed=ms-1&forecast_days={forecast_days}"
+            weather_url = f"https://my.meteoblue.com/packages/basic-3h?apikey={METEOBLUE_API_KEY}&lat={weather_request.latitude}&lon={weather_request.longitude}&format=json&windspeed=ms-1&forecast_days={forecast_days}"
             async with session.get(weather_url) as weather_response:
                 weather_response.raise_for_status()
                 weather_data = await weather_response.json()
 
             # 获取空气质量数据
-            air_quality_url = f"https://api.waqi.info/feed/geo:{request.latitude};{request.longitude}/?token={WAQI_TOKEN}"
+            air_quality_url = f"https://api.waqi.info/feed/geo:{weather_request.latitude};{weather_request.longitude}/?token={WAQI_TOKEN}"
             async with session.get(air_quality_url) as air_quality_response:
                 air_quality_response.raise_for_status()
                 air_quality_data = await air_quality_response.json()
@@ -144,33 +145,72 @@ async def get_weather_advice(request: WeatherRequest):
         context = f"""
         Weather Data (for {forecast_days} days): {json.dumps(weather_data)}
         Air Quality Data: {json.dumps(air_quality_data)}
-        User Location: Latitude {request.latitude}, Longitude {request.longitude}
+        User Location: Latitude {weather_request.latitude}, Longitude {weather_request.longitude}
         """
 
-        # 根据模型类型选择LLM客户端
-        if request.model_type == 'deepseek':
-            llm_response = deepseek_client.chat.completions.create(
-                model="deepseek-reasoner",
-                messages=[{"role": "user", "content": f"{context}\n\nUser Query: {enhanced_query}"}]
-            )
-            ai_response = llm_response.choices[0].message.content
-        elif request.model_type == 'gemini':
-            llm_response = gemini_client.models.generate_content(
-                model="gemini-2.0-flash-thinking-exp-01-21",
-                contents=f"{context}\n\nUser Query: {enhanced_query}"
-            )
-            ai_response = llm_response.text
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported model type: {request.model_type}")
+        async def generate_stream() -> AsyncGenerator[str, None]:
+            try:
+                if weather_request.model_type == 'deepseek':
+                    stream = deepseek_client.chat.completions.create(
+                        model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+                        messages=[{"role": "user", "content": f"{context}\n\nUser Query: {enhanced_query}"}],
+                        stream=True
+                    )
+                    content = ""
+                    reasoning_content = ""
+                    try:
+                        for chunk in stream:
+                            if await request.is_disconnected():
+                                logger.info("Client disconnected, stopping stream")
+                                return
+                            if chunk.choices[0].delta.content:
+                                content = chunk.choices[0].delta.content
+                                yield f"data: {json.dumps({'content': content})}\n\n"
+                            if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
+                                reasoning_content = chunk.choices[0].delta.reasoning_content
+                                yield f"data: {json.dumps({'reasoning_content': reasoning_content})}\n\n"
+                    except ConnectionResetError:
+                        logger.warning("Connection reset by client")
+                        return
+                    except Exception as e:
+                        logger.error(f"Stream processing error: {str(e)}")
+                        raise
+                elif weather_request.model_type == 'gemini':
+                    stream = gemini_client.models.generate_content_stream(
+                        model="gemini-2.0-flash-thinking-exp-01-21",
+                        contents=f"{context}\n\nUser Query: {enhanced_query}"
+                    )
+                    try:
+                        started = False
+                        for chunk in stream:
+                            if await request.is_disconnected():
+                                logger.info("Client disconnected, stopping stream")
+                                return
+                            if chunk.text:
+                                if not started:
+                                    yield f"data: {json.dumps({'start': True})}\n\n"
+                                    started = True
+                                yield f"data: {json.dumps({'content': chunk.text})}\n\n"
+                        if not await request.is_disconnected():
+                            yield "data: [DONE]\n\n"
+                    except ConnectionResetError:
+                        logger.warning("Connection reset by client")
+                        return
+                    except Exception as e:
+                        logger.error(f"Stream processing error: {str(e)}")
+                        raise
+                else:
+                    raise HTTPException(status_code=400, detail=f"Unsupported model type: {weather_request.model_type}")
+                
+                # 移除这里的 DONE 信号，因为已经在各自的处理分支中发送了
+                # if not await request.is_disconnected():
+                #     yield "data: [DONE]\n\n"
+            except Exception as e:
+                logger.error(f"Streaming error: {str(e)}", exc_info=True)
+                if not await request.is_disconnected():
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        # 更新缓存
-        weather_cache[cache_key] = {
-            'weather_data': weather_data,
-            'air_quality_data': air_quality_data,
-            'ai_response': ai_response
-        }
-
-        return JSONResponse(content={'ai_response': ai_response})
+        return StreamingResponse(generate_stream(), media_type="text/event-stream")
 
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=f"API request failed: {str(e)}")
@@ -179,54 +219,101 @@ async def get_weather_advice(request: WeatherRequest):
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 @app.post("/ask_followup")
-async def handle_followup_question(request: FollowupRequest):
+async def handle_followup_question(request: Request, followup_request: FollowupRequest):
     try:
-        enhanced_query = request.query + ' 请直接输出回答。保持原有格式风格，使用分割线和星级评价。'
+        enhanced_query = followup_request.query + ' 请直接输出回答。保持原有格式风格，使用分割线和星级评价。'
         
         cache_key = generate_cache_key(
-            request.latitude,
-            request.longitude,
-            request.forecast_days,
-            request.model_type
+            followup_request.latitude,
+            followup_request.longitude,
+            followup_request.forecast_days,
+            followup_request.model_type
         )
         
         cached_data = weather_cache.get(cache_key)
         if not cached_data:
             raise HTTPException(status_code=400, detail="请先完成初始天气查询才能进行追问")
 
-        if request.model_type == 'deepseek':
-            messages = [{
-                "role": "user",
-                "content": f"""
-                天气数据：{json.dumps(cached_data['weather_data'])}
-                空气质量数据：{json.dumps(cached_data['air_quality_data'])}
-                用户位置：纬度 {request.latitude}，经度 {request.longitude}
+        async def generate_stream() -> AsyncGenerator[str, None]:
+            try:
+                if followup_request.model_type == 'deepseek':
+                    messages = [{
+                        "role": "user",
+                        "content": f"""
+                        天气数据：{json.dumps(cached_data['weather_data'])}
+                        空气质量数据：{json.dumps(cached_data['air_quality_data'])}
+                        用户位置：纬度 {followup_request.latitude}，经度 {followup_request.longitude}
 
-                用户追问：{enhanced_query}
-                """
-            }]
-            llm_response = deepseek_client.chat.completions.create(
-                model="deepseek-reasoner",
-                messages=messages
-            )
-            ai_response = llm_response.choices[0].message.content
-        elif request.model_type == 'gemini':
-            messages = f"""
-                天气数据：{json.dumps(cached_data['weather_data'])}
-                空气质量数据：{json.dumps(cached_data['air_quality_data'])}
-                用户位置：纬度 {request.latitude}，经度 {request.longitude}
+                        用户追问：{enhanced_query}
+                        """
+                    }]
+                    stream = deepseek_client.chat.completions.create(
+                        model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+                        messages=messages,
+                        stream=True
+                    )
+                    content = ""
+                    reasoning_content = ""
+                    try:
+                        for chunk in stream:
+                            if await request.is_disconnected():
+                                logger.info("Client disconnected, stopping stream")
+                                return
+                            if chunk.choices[0].delta.content:
+                                content = chunk.choices[0].delta.content
+                                yield f"data: {json.dumps({'content': content})}\n\n"
+                            if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
+                                reasoning_content = chunk.choices[0].delta.reasoning_content
+                                yield f"data: {json.dumps({'reasoning_content': reasoning_content})}\n\n"
+                    except ConnectionResetError:
+                        logger.warning("Connection reset by client")
+                        return
+                    except Exception as e:
+                        logger.error(f"Stream processing error: {str(e)}")
+                        raise
+                elif followup_request.model_type == 'gemini':
+                    messages = f"""
+                        天气数据：{json.dumps(cached_data['weather_data'])}
+                        空气质量数据：{json.dumps(cached_data['air_quality_data'])}
+                        用户位置：纬度 {followup_request.latitude}，经度 {followup_request.longitude}
 
-                用户追问：{enhanced_query}
-                """
-            llm_response = gemini_client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=messages
-            )
-            ai_response = llm_response.text
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported model type: {request.model_type}")
+                        用户追问：{enhanced_query}
+                        """
+                    stream = gemini_client.models.generate_content_stream(
+                        model="gemini-2.0-flash-thinking-exp-01-21",
+                        contents=messages
+                    )
+                    try:
+                        started = False
+                        for chunk in stream:
+                            if await request.is_disconnected():
+                                logger.info("Client disconnected, stopping stream")
+                                return
+                            if chunk.text:
+                                if not started:
+                                    yield f"data: {json.dumps({'start': True})}\n\n"
+                                    started = True
+                                yield f"data: {json.dumps({'content': chunk.text})}\n\n"
+                        if not await request.is_disconnected():
+                            yield "data: [DONE]\n\n"
+                    except ConnectionResetError:
+                        logger.warning("Connection reset by client")
+                        return
+                    except Exception as e:
+                        logger.error(f"Stream processing error: {str(e)}")
+                        raise
+                else:
+                    raise HTTPException(status_code=400, detail=f"Unsupported model type: {followup_request.model_type}")
+                
+                # 移除这里的 DONE 信号，因为已经在各自的处理分支中发送了
+                # if not await request.is_disconnected():
+                #     yield "data: [DONE]\n\n"
+            except Exception as e:
+                logger.error(f"Streaming error: {str(e)}", exc_info=True)
+                if not await request.is_disconnected():
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        return JSONResponse(content={'ai_response': ai_response})
+        return StreamingResponse(generate_stream(), media_type="text/event-stream")
 
     except Exception as e:
         logger.error(f"Error in handle_followup_question: {str(e)}", exc_info=True)
@@ -318,7 +405,7 @@ if __name__ == "__main__":
         loop="uvloop",
         http="httptools",
         log_level="info",
-        reload=False,  # 生产环境禁用热重载
+        reload=True,  # 生产环境禁用热重
         access_log=True,
     )
     server = uvicorn.Server(uvicorn_config)
