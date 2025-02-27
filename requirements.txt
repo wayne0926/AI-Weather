@@ -9,4 +9,4 @@ openai
 python-dotenv
 google-genai
 httptools
-uvloop=
+uvloop

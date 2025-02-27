@@ -1,1 +1,0 @@
-3. Format your responses in markdown. Use backticks for inline code formatting and triple backticks for code blocks. Never use HTML tags like </code> or </pre> in responses. 
