@@ -115,7 +115,63 @@ async def get_sw():
 async def get_weather_advice(request: Request, weather_request: WeatherRequest):
     try:
         # 添加提示语到查询
-        enhanced_query = weather_request.query + '请直接输出回答。同时请在最开头得出我的位置以及我的位置大致的名称，如果是询问优劣、最适合类型的问题，请使用五★进行评级。必须高度充分利用Markdown语法进行结构化，日期明显易读，日期与日期之间必修使用Markdown语法分割线。必须在回答文本中使用对应emoji以提升易读性'
+        enhanced_query = weather_request.query + '''
+请以友好而专业的方式回答，将结构化信息融入自然对话中。
+
+🎯 基本框架：
+1. 开场白（简短友好）：
+   - 问候语
+   - 📍 位置信息：[经度，纬度] - [地理名称]
+   - 天气概览：用一句话概括当前天气特点
+
+2. 核心天气信息（分类呈现）：
+   ⏰ 实时天气：
+   温度：[数值]°C
+   体感：[数值]°C
+   湿度：[数值]%
+   风向：[方向] [风速]m/s
+   
+   🌡️ 今日温差：
+   最高温：[数值]°C
+   最低温：[数值]°C
+   温差：[数值]°C
+
+   💨 空气状况：
+   AQI指数：[数值]
+   主要污染物：[名称]
+   空气质量：[等级描述]
+
+3. 📅 未来天气预报（按日期分段）：
+   "YYYY-MM-DD"
+   - 天气特征：[描述]
+   - 温度区间：[最低温]-[最高温]°C
+   - 降水概率：[数值]%
+   - 关键提醒：[重点信息]
+   ---
+
+4. 👔 实用建议：
+   > 穿衣建议：[具体建议]
+   > 出行建议：[具体建议]
+   > 活动建议：[具体建议]
+
+5. ⚠️ 特别提醒（如有）：
+   - 极端天气预警
+   - 特殊天气注意事项
+   - 健康防护建议
+
+6. 结语：
+   - 温馨提示或祝福语
+   - 表达关心
+
+请注意：
+1. 在保持结构清晰的同时，用自然的语言连接各部分
+2. 重要数据要用"引号"标注
+3. 关键提醒使用 > 符号
+4. 在合适的地方使用emoji增加可读性
+5. 极端天气使用 ⚠️ 突出显示
+6. 用分隔线(---)区分不同日期的预报
+
+请用温和友好的语气输出，但确保信息完整且结构清晰。'''
         
         # 生成缓存键
         cache_key = generate_cache_key(
@@ -180,19 +236,21 @@ async def get_weather_advice(request: Request, weather_request: WeatherRequest):
                         model="gemini-2.0-flash-thinking-exp-01-21",
                         contents=f"{context}\n\nUser Query: {enhanced_query}"
                     )
+                    started = False
                     try:
-                        started = False
                         for chunk in stream:
                             if await request.is_disconnected():
                                 logger.info("Client disconnected, stopping stream")
                                 return
+                            if not started:
+                                started = True
+                                yield f"data: {json.dumps({'start': True})}\n\n"
                             if chunk.text:
-                                if not started:
-                                    yield f"data: {json.dumps({'start': True})}\n\n"
-                                    started = True
-                                yield f"data: {json.dumps({'content': chunk.text})}\n\n"
+                                # 确保表格格式在 JSON 序列化时保持不变
+                                formatted_text = chunk.text.replace('\\n', '\n').replace('\\t', '\t')
+                                yield f"data: {json.dumps({'content': formatted_text, 'preserve_format': True})}\n\n"
                         if not await request.is_disconnected():
-                            yield "data: [DONE]\n\n"
+                            yield "data: {\"type\": \"done\"}\n\n"  # 修改完成信号的格式
                     except ConnectionResetError:
                         logger.warning("Connection reset by client")
                         return
@@ -221,7 +279,7 @@ async def get_weather_advice(request: Request, weather_request: WeatherRequest):
 @app.post("/ask_followup")
 async def handle_followup_question(request: Request, followup_request: FollowupRequest):
     try:
-        enhanced_query = followup_request.query + ' 请直接输出回答。保持原有格式风格，使用分割线和星级评价。'
+        enhanced_query = followup_request.query + ' 请直接输出回答。保持原有格式风格，使用分割线和星级评价。不要使用任何Markdown语法标记。'
         
         cache_key = generate_cache_key(
             followup_request.latitude,
@@ -283,19 +341,21 @@ async def handle_followup_question(request: Request, followup_request: FollowupR
                         model="gemini-2.0-flash-thinking-exp-01-21",
                         contents=messages
                     )
+                    started = False
                     try:
-                        started = False
                         for chunk in stream:
                             if await request.is_disconnected():
                                 logger.info("Client disconnected, stopping stream")
                                 return
+                            if not started:
+                                started = True
+                                yield f"data: {json.dumps({'start': True})}\n\n"
                             if chunk.text:
-                                if not started:
-                                    yield f"data: {json.dumps({'start': True})}\n\n"
-                                    started = True
-                                yield f"data: {json.dumps({'content': chunk.text})}\n\n"
+                                # 确保表格格式在 JSON 序列化时保持不变
+                                formatted_text = chunk.text.replace('\\n', '\n').replace('\\t', '\t')
+                                yield f"data: {json.dumps({'content': formatted_text, 'preserve_format': True})}\n\n"
                         if not await request.is_disconnected():
-                            yield "data: [DONE]\n\n"
+                            yield "data: {\"type\": \"done\"}\n\n"  # 修改完成信号的格式
                     except ConnectionResetError:
                         logger.warning("Connection reset by client")
                         return
@@ -319,36 +379,6 @@ async def handle_followup_question(request: Request, followup_request: FollowupR
         logger.error(f"Error in handle_followup_question: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"处理追问时出错: {str(e)}")
 
-@app.get("/get_ip_location")
-async def get_ip_location(request: Request):
-    def get_client_ip(request: Request) -> str:
-        forwarded_for = request.headers.get("X-Forwarded-For")
-        if forwarded_for:
-            return forwarded_for.split(",")[0].strip()
-        return request.client.host if request.client else "127.0.0.1"
-
-    try:
-        client_ip = get_client_ip(request)
-        logger.info(f"Client IP: {client_ip}")
-
-        # Baidu Maps API configuration
-        host = "https://api.map.baidu.com"
-        uri = "/location/ip"
-        ak = BAIDU_MAP_AK
-        
-        # Make request to Baidu API
-        url = f"{host}{uri}?ak={ak}&ip={client_ip}&coor=bd09ll"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                location_data = await response.json()
-
-        return JSONResponse(content=location_data)
-
-    except Exception as e:
-        logger.error(f"Error in get_ip_location: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error getting location: {str(e)}")
-
 @app.post("/get_city_location")
 async def get_city_location(request: CityRequest):
     if not request.city:
@@ -369,7 +399,7 @@ async def get_city_location(request: CityRequest):
 
         # 使用Gemini API获取经纬度
         llm_response = gemini_client.models.generate_content(
-            model="gemini-2.0-flash-lite-preview-02-05",
+            model="gemini-2.0-flash-lite",
             contents=prompt
         )
 

@@ -103,7 +103,6 @@ python app.py
 1. **位置获取**
    - 点击📍按钮使用GPS定位
    - 输入城市名称手动定位（由 Gemini-2.0-Flash-Lite 提供地理编码服务）
-   - 自动IP定位（备选方案）
 
 2. **AI模型选择**
    - Gemini：Google的新一代AI模型（Gemini-2.0-Flash-Thinking）
