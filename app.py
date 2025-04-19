@@ -71,7 +71,7 @@ if missing_keys:
     raise ValueError(f"Missing API keys: {', '.join(missing_keys)}. Please set them in your .env file.")
 
 # 初始化AI客户端
-deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.siliconflow.cn/v1/")
+deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://openrouter.ai/api/v1/")
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # 请求模型
@@ -118,50 +118,15 @@ async def get_weather_advice(request: Request, weather_request: WeatherRequest):
         enhanced_query = weather_request.query + '''
 请以友好而专业的方式回答，将结构化信息融入自然对话中。
 
-🎯 基本框架：
 1. 开场白（简短友好）：
    - 问候语
    - 📍 位置信息：[经度，纬度] - [地理名称]
-   - 天气概览：用一句话概括当前天气特点
 
-2. 核心天气信息（分类呈现）：
-   ⏰ 实时天气：
-   温度：[数值]°C
-   体感：[数值]°C
-   湿度：[数值]%
-   风向：[方向] [风速]m/s
-   
-   🌡️ 今日温差：
-   最高温：[数值]°C
-   最低温：[数值]°C
-   温差：[数值]°C
-
-   💨 空气状况：
-   AQI指数：[数值]
-   主要污染物：[名称]
-   空气质量：[等级描述]
-
-3. 📅 未来天气预报（按日期分段）：
-   "YYYY-MM-DD"
-   - 天气特征：[描述]
-   - 温度区间：[最低温]-[最高温]°C
-   - 降水概率：[数值]%
-   - 关键提醒：[重点信息]
-   ---
-
-4. 👔 实用建议：
-   > 穿衣建议：[具体建议]
-   > 出行建议：[具体建议]
-   > 活动建议：[具体建议]
-
-5. ⚠️ 特别提醒（如有）：
+2. ⚠️ 特别提醒（如有）：
    - 极端天气预警
    - 特殊天气注意事项
    - 健康防护建议
 
-6. 结语：
-   - 温馨提示或祝福语
-   - 表达关心
 
 请注意：
 1. 在保持结构清晰的同时，用自然的语言连接各部分
@@ -170,6 +135,7 @@ async def get_weather_advice(request: Request, weather_request: WeatherRequest):
 4. 在合适的地方使用emoji增加可读性
 5. 极端天气使用 ⚠️ 突出显示
 6. 用分隔线(---)区分不同日期的预报
+7. 关注用户提出的需求和问题
 
 请用温和友好的语气输出，但确保信息完整且结构清晰。'''
         
@@ -208,7 +174,7 @@ async def get_weather_advice(request: Request, weather_request: WeatherRequest):
             try:
                 if weather_request.model_type == 'deepseek':
                     stream = deepseek_client.chat.completions.create(
-                        model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+                        model="deepseek/deepseek-chat-v3-0324:free",
                         messages=[{"role": "user", "content": f"{context}\n\nUser Query: {enhanced_query}"}],
                         stream=True
                     )
@@ -233,7 +199,7 @@ async def get_weather_advice(request: Request, weather_request: WeatherRequest):
                         raise
                 elif weather_request.model_type == 'gemini':
                     stream = gemini_client.models.generate_content_stream(
-                        model="gemini-2.0-flash-thinking-exp-01-21",
+                        model="gemini-2.5-pro-exp-03-25",
                         contents=f"{context}\n\nUser Query: {enhanced_query}"
                     )
                     started = False
@@ -306,7 +272,7 @@ async def handle_followup_question(request: Request, followup_request: FollowupR
                         """
                     }]
                     stream = deepseek_client.chat.completions.create(
-                        model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+                        model="deepseek/deepseek-chat-v3-0324:free",
                         messages=messages,
                         stream=True
                     )
@@ -338,7 +304,7 @@ async def handle_followup_question(request: Request, followup_request: FollowupR
                         用户追问：{enhanced_query}
                         """
                     stream = gemini_client.models.generate_content_stream(
-                        model="gemini-2.0-flash-thinking-exp-01-21",
+                        model="gemini-2.5-pro-exp-03-25",
                         contents=messages
                     )
                     started = False
@@ -435,7 +401,8 @@ if __name__ == "__main__":
         loop="uvloop",
         http="httptools",
         log_level="info",
-        reload=True,  # 生产环境禁用热重
+        reload=False,  # 生产环境禁用热重
+        reload_excludes=['*.conda*'],
         access_log=True,
     )
     server = uvicorn.Server(uvicorn_config)

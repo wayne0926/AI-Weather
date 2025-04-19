@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 天气助手</title>
-    <meta name="theme-color" content="#4a90e2">
+    <meta name="theme-color" content="#ffffff">
     <meta name="description" content="An intelligent weather assistant powered by AI">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,885 +13,837 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" href="/static/icon.png" type="image/png">
     <link rel="apple-touch-icon" href="/static/icon.png">
-    <link rel="stylesheet" href="/static/style.css">
-</head>
+    <script src="https://unpkg.com/tailwindcss-cdn@3.4.10/tailwindcss-with-forms.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'light-bg': '#FFFFFF',
+                        'light-card': '#FFFFFF',
+                        'light-border': 'rgba(55, 53, 47, 0.16)',
+                        'light-input': '#F7F7F7',
+                        'light-input-border': 'rgba(55, 53, 47, 0.16)',
+                        'light-hover': 'rgba(55, 53, 47, 0.03)',
+                        'light-text-primary': 'rgb(55, 53, 47)',
+                        'light-text-secondary': 'rgba(55, 53, 47, 0.6)',
+                        'light-text-placeholder': 'rgba(55, 53, 47, 0.4)',
+                        'light-accent': '#2563EB',
+                        'light-accent-hover': '#1D4ED8',
+                        'light-button': 'rgb(55, 53, 47)',
+                        'light-button-hover': 'rgba(55, 53, 47, 0.8)',
+                        'light-button-text': '#FFFFFF',
+                        'dark-bg': '#191919',
+                        'dark-card': '#2F2F2F',
+                        'dark-border': 'rgba(255, 255, 255, 0.1)',
+                        'dark-input': '#3A3A3A',
+                        'dark-input-border': 'rgba(255, 255, 255, 0.1)',
+                        'dark-hover': 'rgba(255, 255, 255, 0.05)',
+                        'dark-text-primary': 'rgba(255, 255, 255, 0.9)',
+                        'dark-text-secondary': 'rgba(255, 255, 255, 0.5)',
+                        'dark-text-placeholder': 'rgba(255, 255, 255, 0.3)',
+                        'dark-accent': '#3B82F6',
+                        'dark-accent-hover': '#60A5FA',
+                        'dark-button': 'rgba(255, 255, 255, 0.9)',
+                        'dark-button-hover': 'rgba(255, 255, 255, 0.7)',
+                        'dark-button-text': '#191919',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', '"Noto Sans"', 'sans-serif', '"Apple Color Emoji"', '"Segoe UI Emoji"', '"Segoe UI Symbol"', '"Noto Color Emoji"'],
+                    },
+                    animation: {
+                        spin: 'spin 1s linear infinite',
+                        fadeIn: 'fadeIn 0.3s ease-out',
+                    },
+                    keyframes: {
+                        spin: { to: { transform: 'rotate(360deg)' } },
+                        fadeIn: { from: { opacity: '0', transform: 'translateY(4px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @tailwind base;
+        @tailwind components;
+        @tailwind utilities;
 
-<body>
-    <div class="container">
-        <div class="header" id="headerSection">
-            <div class="sparkle-icon" id="logoIcon">
-                ✨
+        @layer base {
+            html {
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+            }
+            body {
+                @apply bg-light-bg text-light-text-primary dark:bg-dark-bg dark:text-dark-text-primary font-sans min-h-screen flex flex-col px-4 transition-colors duration-200;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                @apply font-medium text-light-text-primary dark:text-dark-text-primary;
+            }
+            h1 { @apply text-3xl tracking-tight; }
+            h2 { @apply text-xl; }
+            p { @apply leading-relaxed; }
+        }
+
+        @layer components {
+            .search-icon.loading::before {
+                content: "";
+                @apply inline-block w-4 h-4 border-2 border-light-border dark:border-dark-border border-t-light-text-secondary dark:border-t-dark-text-secondary rounded-full animate-spin;
+            }
+            ::-webkit-scrollbar { @apply w-1.5 h-1.5; }
+            ::-webkit-scrollbar-thumb { @apply bg-light-border dark:bg-dark-border rounded-full; }
+            ::-webkit-scrollbar-track { @apply bg-transparent; }
+            #clearSearch { display: none; }
+            #clearSearch.visible { display: flex; }
+            .container.loading { @apply cursor-wait; }
+            .container.loading button,
+            .container.loading input,
+            .container.loading span[data-query] { @apply opacity-50 pointer-events-none; }
+            .container.loading .search-icon.loading { @apply opacity-100 pointer-events-auto; }
+            input[type="range"] {
+                @apply w-full h-2 rounded-full appearance-none cursor-pointer bg-light-input dark:bg-dark-input;
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            }
+            input[type="range"]::-webkit-slider-runnable-track {
+                @apply w-full h-2 rounded-full appearance-none cursor-pointer bg-light-input dark:bg-dark-input;
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            }
+            input[type="range"]::-moz-range-track {
+                @apply w-full h-2 rounded-full appearance-none cursor-pointer border-none bg-light-input dark:bg-dark-input;
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            }
+            input[type="range"]::-webkit-slider-thumb {
+                @apply appearance-none w-4 h-4 bg-light-text-primary dark:bg-dark-text-primary rounded-full cursor-pointer ring-2 ring-offset-2 ring-offset-light-card dark:ring-offset-dark-card ring-transparent focus:ring-light-text-primary/50 dark:focus:ring-dark-text-primary/50 transition-all duration-150 ease-in-out shadow;
+                margin-top: -4px; /* Centers the thumb on the track */
+            }
+            input[type="range"]::-moz-range-thumb {
+                @apply appearance-none w-4 h-4 bg-light-text-primary dark:bg-dark-text-primary rounded-full cursor-pointer border-none focus:ring-2 focus:ring-light-text-primary/50 dark:focus:ring-dark-text-primary/50 transition-all duration-150 ease-in-out shadow;
+            }
+            input[type="range"]:focus::-webkit-slider-thumb { @apply ring-light-text-primary/50 dark:ring-dark-text-primary/50; }
+            input[type="range"]:focus::-moz-range-thumb { @apply ring-2 ring-light-text-primary/50 dark:focus:ring-dark-text-primary/50; }
+            .form-radio {
+                @apply bg-transparent border-light-border dark:border-dark-border text-light-text-primary dark:text-dark-text-primary focus:ring-light-text-primary dark:focus:ring-dark-text-primary focus:ring-offset-light-card dark:focus:ring-offset-dark-card;
+            }
+            /* Style for checkboxes to match the design system */
+            input[type="checkbox"] {
+                @apply bg-transparent border-light-border dark:border-dark-border text-light-text-primary dark:text-dark-text-primary focus:ring-light-text-primary dark:focus:ring-dark-text-primary focus:ring-offset-light-card dark:focus:ring-offset-dark-card rounded;
+            }
+            .animate-fade {
+                animation: fadeIn 0.3s ease-out;
+            }
+            .input-focus {
+                @apply focus:outline-none focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent focus:border-transparent dark:focus:border-transparent transition-shadow duration-150;
+            }
+            .card {
+                @apply bg-light-card dark:bg-dark-card border border-light-border dark:border-dark-border rounded-lg shadow-sm mb-8 transition-colors duration-200;
+            }
+            .btn {
+                @apply h-9 px-3 text-sm rounded-md flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-light-card dark:focus:ring-offset-dark-card;
+            }
+            .btn-primary {
+                @apply bg-light-button dark:bg-dark-button text-light-button-text dark:text-dark-button-text hover:bg-light-button-hover dark:hover:bg-dark-button-hover focus:ring-light-button dark:focus:ring-dark-button;
+            }
+            .btn-secondary {
+                @apply border border-light-border dark:border-dark-border text-light-text-primary dark:text-dark-text-primary hover:bg-light-hover dark:hover:bg-dark-hover focus:ring-light-accent dark:focus:ring-dark-accent;
+            }
+            .btn-icon {
+                @apply h-9 w-9 border border-light-border dark:border-dark-border rounded-md flex items-center justify-center hover:bg-light-hover dark:hover:bg-dark-hover transition text-light-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-light-card dark:focus:ring-offset-dark-card focus:ring-light-accent dark:focus:ring-dark-accent;
+            }
+            .btn-ghost {
+                @apply h-7 w-7 rounded-full hover:bg-light-hover dark:hover:bg-dark-hover flex items-center justify-center text-light-text-secondary dark:text-dark-text-secondary text-lg transition focus:outline-none focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent;
+            }
+            .quick-query-btn {
+                @apply px-2.5 py-1 text-xs border border-light-border dark:border-dark-border rounded-md hover:bg-light-hover dark:hover:bg-dark-hover transition text-light-text-primary dark:text-dark-text-primary focus:outline-none focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent;
+            }
+            .input-field {
+                @apply w-full bg-light-input dark:bg-dark-input border border-light-input-border dark:border-dark-input-border rounded-md py-1.5 px-3 text-sm text-light-text-primary dark:text-dark-text-primary placeholder-light-text-placeholder dark:placeholder-dark-text-placeholder input-focus transition-colors duration-200;
+            }
+            .styled-slider-bg {
+                display: none; /* Hide this class temporarily */
+            }
+            /* Default background for slider track before JS loads */
+            input[type="range"].styled-slider-bg {
+                display: block; /* Override the hide */
+                @apply bg-light-input dark:bg-dark-input;
+            }
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            @apply font-medium mb-3 mt-5 text-light-text-primary dark:text-dark-text-primary;
+        }
+        .markdown-content h1 { @apply text-xl border-b border-light-border dark:border-dark-border pb-2; }
+        .markdown-content h2 { @apply text-lg border-b border-light-border dark:border-dark-border pb-2; }
+        .markdown-content h3 { @apply text-base; }
+        .markdown-content h4 { @apply text-sm font-semibold; }
+        .markdown-content p {
+            @apply mb-4 leading-relaxed text-light-text-primary dark:text-dark-text-primary;
+        }
+        .markdown-content ul,
+        .markdown-content ol {
+            @apply pl-6 mb-4 list-outside;
+        }
+        .markdown-content ul { @apply list-disc; }
+        .markdown-content ol { @apply list-decimal; }
+        .markdown-content li { @apply mb-1; }
+        .markdown-content li > p { @apply mb-1; }
+        .markdown-content li > ul,
+        .markdown-content li > ol { @apply mt-1 mb-1; }
+        .markdown-content strong {
+            @apply font-semibold text-light-text-primary dark:text-dark-text-primary;
+        }
+        .markdown-content a {
+            @apply text-light-accent dark:text-dark-accent hover:text-light-accent-hover dark:hover:text-dark-accent-hover hover:underline;
+        }
+        .markdown-content code {
+            @apply bg-light-input dark:bg-dark-input text-sm px-1 py-0.5 rounded font-mono text-light-text-secondary dark:text-dark-text-secondary;
+        }
+        .markdown-content pre {
+            @apply bg-light-input dark:bg-dark-input border border-light-input-border dark:border-dark-input-border rounded-md p-3 mb-4 overflow-x-auto text-sm;
+        }
+        .markdown-content pre code {
+            @apply bg-transparent p-0 rounded-none border-none text-light-text-secondary dark:text-dark-text-secondary;
+        }
+        .markdown-content blockquote {
+            @apply border-l-4 border-light-border dark:border-dark-border pl-4 italic text-light-text-secondary dark:text-dark-text-secondary mb-4;
+        }
+        .markdown-content hr {
+            @apply border-t border-light-border dark:border-dark-border my-6;
+        }
+        .markdown-content table {
+            @apply w-full border-collapse border border-light-border dark:border-dark-border mb-4 text-sm;
+        }
+        .markdown-content th,
+        .markdown-content td {
+            @apply border border-light-border dark:border-dark-border px-3 py-1.5 text-left;
+        }
+        .markdown-content th {
+            @apply bg-light-input dark:bg-dark-input font-medium text-light-text-primary dark:text-dark-text-primary;
+        }
+        .markdown-content tr:nth-child(even) {
+            /* Optional: Add alternating row background */
+            /* @apply bg-light-input/50; */
+        }
+    </style>
+</head>
+<body class="bg-light-bg dark:bg-dark-bg">
+    <div class="container mx-auto py-12 max-w-2xl flex-1">
+        <header class="mb-10 text-center">
+            <h1 id="appTitle" class="text-3xl font-medium tracking-tight mb-1 text-light-text-primary dark:text-dark-text-primary cursor-pointer">AI 天气助手</h1>
+            <p class="text-light-text-secondary dark:text-dark-text-secondary text-sm">智能天气预报</p>
+        </header>
+        
+        <div class="card">
+            <div class="p-5">
+                <h2 class="text-lg font-medium mb-4">位置</h2>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="flex-1">
+                        <input
+                            type="text"
+                            id="cityInput"
+                            placeholder="请输入城市名称"
+                            class="input-field"
+                            aria-label="城市名称输入框">
+                        <p id="locationStatus" class="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1.5">或使用当前位置</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="getLocationBtn" class="btn-icon" aria-label="获取位置">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </button>
+                        <button id="submitCity" class="btn btn-primary" aria-label="提交城市">
+                            设置位置
+                        </button>
+                    </div>
+                </div>
             </div>
-            <h1 id="appTitle">AI 天气助手</h1>
         </div>
-        <div class="location-info-container">
-            <div class="location-info" role="status">请输入城市名称或点击📍获取当前位置</div>
-            <div id="manualLocationContainer" class="manual-location-container">
-                <input type="text" 
-                       id="cityInput" 
-                       placeholder="请输入城市名称" 
-                       class="city-input"
-                       aria-label="城市名称输入框">
-                <button id="submitCity" class="submit-city-btn" aria-label="提交城市">
-                    ➤
+        
+        <div class="card">
+            <div class="p-5">
+                <h2 class="text-lg font-medium mb-4">天气查询</h2>
+                <div class="mb-5">
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="queryInput"
+                            placeholder="例如：这周末会下雨吗？明天穿什么合适？"
+                            class="input-field pr-20"
+                            aria-label="搜索输入框">
+                        <button id="clearSearch" class="btn-ghost absolute right-11 top-1/2 transform -translate-y-1/2" aria-label="清除搜索">✕</button>
+                        <button id="searchButton" class="btn btn-primary absolute right-1.5 top-1/2 transform -translate-y-1/2 h-8 w-8 !p-0" aria-label="搜索">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-5">
+                    <label for="forecastDays" class="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">
+                        预测周期: <span id="forecastDaysValue" class="font-medium text-light-text-primary dark:text-dark-text-primary">5</span> 天
+                    </label>
+                    <input
+                        type="range"
+                        id="forecastDays"
+                        min="1"
+                        max="14"
+                        value="5"
+                        class="w-full"
+                        aria-label="预测天数选择">
+                </div>
+                
+                <div class="flex flex-wrap gap-2">
+                    <button data-query="未来几天会下雨吗？" data-days="3" class="quick-query-btn">
+                        降雨预报
+                    </button>
+                    <button data-query="明天穿什么衣服合适？" data-days="2" class="quick-query-btn">
+                        穿衣建议
+                    </button>
+                    <button data-query="这个周末适合徒步吗？" data-days="5" class="quick-query-btn">
+                        户外活动
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <div class="flex items-center justify-start gap-4 text-sm mb-4">
+                <span class="text-light-text-secondary dark:text-dark-text-secondary">模型:</span>
+                <div class="flex gap-4">
+                    <label for="geminiModel" class="flex items-center cursor-pointer text-light-text-primary dark:text-dark-text-primary">
+                        <input type="radio" id="geminiModel" name="model" value="gemini" checked class="form-radio h-4 w-4 mr-1.5">
+                        <span class="text-light-text-primary dark:text-dark-text-primary">Gemini</span>
+                    </label>
+                    <label for="deepseekModel" class="flex items-center cursor-pointer text-light-text-primary dark:text-dark-text-primary">
+                        <input type="radio" id="deepseekModel" name="model" value="deepseek" class="form-radio h-4 w-4 mr-1.5">
+                        <span class="text-light-text-primary dark:text-dark-text-primary">DeepSeek</span>
+                    </label>
+                </div>
+            </div>
+            <div id="reasoning-container" class="bg-light-input dark:bg-dark-input border border-light-border dark:border-dark-border rounded-md p-2 text-xs text-light-text-secondary dark:text-dark-text-secondary max-h-24 overflow-y-auto transition-colors duration-200" style="display: none;">
+                <div class="reasoning-content whitespace-pre-wrap font-mono animate-fade"></div>
+            </div>
+        </div>
+        
+        <div id="response-container" class="card min-h-48 animate-fade prose prose-sm max-w-none dark:prose-invert prose-p:text-light-text-primary dark:prose-p:text-dark-text-primary prose-headings:text-light-text-primary dark:prose-headings:text-dark-text-primary prose-strong:text-light-text-primary dark:prose-strong:text-dark-text-primary prose-blockquote:text-light-text-secondary dark:prose-blockquote:text-dark-text-secondary prose-code:text-light-text-secondary dark:prose-code:text-dark-text-secondary" role="region" aria-live="polite">
+            <div class="flex flex-col items-center justify-center h-full p-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-light-text-secondary dark:text-dark-text-secondary mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+                <h3 class="text-sm font-medium mb-1 text-light-text-primary dark:text-dark-text-primary">天气智能助手</h3>
+                <p class="text-xs text-light-text-secondary dark:text-dark-text-secondary max-w-xs">
+                    输入您的位置和天气问题以获取精准分析
+                </p>
+            </div>
+        </div>
+        
+        <div id="followupSection" class="mt-5 hidden animate-fade">
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="followupInput" 
+                    placeholder="询问后续问题..." 
+                    class="input-field pr-12"
+                    aria-label="追问输入框">
+                <button id="submitFollowup" class="btn btn-primary absolute right-1.5 top-1/2 transform -translate-y-1/2 h-8 w-8 !p-0" aria-label="提交追问">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
                 </button>
-                <button class="get-location-btn" id="getLocationBtn" aria-label="获取位置">
-                    📍
-                </button>
-            </div>
-        </div>
-        <div class="input-controls">
-            <!-- Model Selection Radio Buttons -->
-            <div class="model-selection-container">
-                <div class="model-radio">
-                    <input type="radio" id="geminiModel" name="model" value="gemini" checked>
-                    <label for="geminiModel">Gemini</label>
-                </div>
-                <div class="model-radio">
-                    <input type="radio" id="deepseekModel" name="model" value="deepseek">
-                    <label for="deepseekModel">DeepSeek</label>
-                </div>
-            </div>
-            <div class="search-bar-container">
-                <input type="text" class="search-bar" placeholder="问点什么吧..." aria-label="搜索输入框" id="queryInput">
-                <button class="clear-search" aria-label="清除搜索" id="clearSearch">✕</button>
-                <button class="search-icon" aria-label="搜索" id="searchButton"></button>
-            </div>
-            <div class="example-queries">
-                <span class="example-query" data-query="这几天适合户外单车🚴吗？" data-days="5">单车🚴</span>
-                <span class="example-query" data-query="明天穿什么衣服👗合适？" data-days="2">穿衣👗</span>
-                <span class="example-query" data-query="未来三天会下雨🌧️吗？" data-days="3">下雨🌧️</span>
-                <span class="example-query" data-query="这周适合去海边🏖️吗？" data-days="7">海边🏖️</span>
-                <span class="example-query" data-query="后天要降温🥶吗？" data-days="2">降温🥶</span>
-            </div>
-            <div class="forecast-days-control">
-                <label for="forecastDays">预测天数:</label>
-                <div class="forecast-days-slider-container">
-                    <input type="range" id="forecastDays" min="1" max="14" value="5" class="forecast-days-slider"
-                        aria-label="预测天数选择" />
-                    <span class="forecast-days-value" id="forecastDaysValue">5</span>
-                </div>
-            </div>
-        </div>
-        <div id="reasoning-container" class="reasoning-container">
-            <div class="reasoning-content"></div>
-        </div>
-        <div id="response-container" role="region" aria-live="polite">
-        </div>
-        <div id="followupSection" style="display: none;">
-            <div class="followup-question">需要进一步了解什么？</div>
-            <div class="search-bar-container">
-                <input type="text" class="search-bar" placeholder="输入追问内容..." aria-label="追问输入框" id="followupInput">
-                <button class="search-icon" aria-label="提交追问" id="submitFollowup">➤</button>
             </div>
         </div>
     </div>
+    
+    <footer class="py-6 border-t border-light-border dark:border-dark-border mt-12 transition-colors duration-200">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-xs text-light-text-secondary dark:text-dark-text-secondary">© AI 天气智能助手</p>
+        </div>
+    </footer>
+
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        // console.log('ServiceWorker registration successful:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('ServiceWorker registration failed:', error);
-                    });
+                navigator.serviceWorker.register('/sw.js').catch(error => {
+                    console.error('ServiceWorker registration failed:', error);
+                });
             });
         }
 
-        // 缓存天气数据并显示追问框 (Cache weather data and show followup)
         let cachedWeatherData = null;
-
-        function showFollowup() {
-            document.getElementById('followupSection').style.display = 'block';
-            document.getElementById('followupInput').focus();
-        }
-
-        // 延迟加载marked.js
+        let currentLat, currentLon;
         let markedLoaded = false;
         let markedLoadPromise = null;
-        
+
+        const cityInput = document.getElementById('cityInput');
+        const submitCityButton = document.getElementById('submitCity');
+        const getLocationButton = document.getElementById('getLocationBtn');
+        const locationStatus = document.getElementById('locationStatus');
+        const queryInput = document.getElementById('queryInput');
+        const clearButton = document.getElementById('clearSearch');
+        const searchButton = document.getElementById('searchButton');
+        const forecastDaysInput = document.getElementById('forecastDays');
+        const forecastDaysValueDisplay = document.getElementById('forecastDaysValue');
+        const quickQueryButtons = document.querySelectorAll('.quick-query-btn');
+        const responseContainer = document.getElementById('response-container');
+        const followupSection = document.getElementById('followupSection');
+        const followupInput = document.getElementById('followupInput');
+        const submitFollowupButton = document.getElementById('submitFollowup');
+        const headerSection = document.getElementById('appTitle');
+        const reasoningContainer = document.getElementById('reasoning-container');
+        const reasoningContent = reasoningContainer?.querySelector('.reasoning-content');
+
+        const LOCATION_MESSAGES = {
+            LOADING: '正在获取位置信息...',
+            DENIED: '位置信息访问被拒绝，请手动输入城市',
+            ERROR: '无法获取您的位置信息，请手动输入城市',
+            UNSUPPORTED: '您的浏览器不支持地理位置功能，请手动输入城市',
+            PROMPT: '或使用当前位置',
+            SUCCESS: (lat, lon) => `当前位置: ${lat.toFixed(3)}, ${lon.toFixed(3)}`,
+            CITY_SUCCESS: (city, lat, lon) => `${city} (${lat.toFixed(3)}, ${lon.toFixed(3)})`,
+            CITY_ERROR: (city) => `无法获取"${city}"的位置`
+        };
+
+        function updateLocationStatus(message, isError = false) {
+            if (locationStatus) {
+                locationStatus.textContent = message;
+                locationStatus.className = 'text-xs mt-1.5 ' + 
+                    (isError ? 'text-red-500 dark:text-red-400' : 'text-light-text-secondary dark:text-dark-text-secondary');
+            }
+        }
+
+        async function handleCitySubmit() {
+            const city = cityInput?.value.trim();
+            if (!city) {
+                updateLocationStatus('请输入城市名称', true);
+                return;
+            }
+
+            try {
+                updateLocationStatus('正在获取城市位置信息...');
+                const response = await fetch('/get_city_location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city: city })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ 
+                        error: `HTTP error! status: ${response.status}` 
+                    }));
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                currentLat = parseFloat(data.latitude);
+                currentLon = parseFloat(data.longitude);
+                
+                updateLocationStatus(LOCATION_MESSAGES.CITY_SUCCESS(city, currentLat, currentLon));
+                cityInput.value = '';
+            } catch (error) {
+                console.error('获取城市位置失败:', error);
+                updateLocationStatus(`${LOCATION_MESSAGES.CITY_ERROR(city)}: ${error.message}`, true);
+            }
+        }
+
+        function getLocation() {
+            updateLocationStatus(LOCATION_MESSAGES.LOADING);
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentLat = position.coords.latitude;
+                        currentLon = position.coords.longitude;
+                        updateLocationStatus(LOCATION_MESSAGES.SUCCESS(currentLat, currentLon));
+                    },
+                    (error) => {
+                        const message = {
+                            1: LOCATION_MESSAGES.DENIED,
+                            2: LOCATION_MESSAGES.ERROR,
+                            3: LOCATION_MESSAGES.ERROR
+                        }[error.code] || LOCATION_MESSAGES.ERROR;
+                        updateLocationStatus(message, true);
+                    },
+                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+                );
+            } else {
+                updateLocationStatus(LOCATION_MESSAGES.UNSUPPORTED, true);
+            }
+        }
+
+        function showLoading() {
+            if (responseContainer) {
+                responseContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full p-8">
+                        <div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-light-text-primary dark:border-dark-text-primary mb-3"></div>
+                        <p class="text-sm text-light-text-primary dark:text-dark-text-primary">正在分析天气数据...</p>
+                    </div>
+                `;
+                responseContainer.style.display = 'block';
+            }
+            
+            if (searchButton) {
+                searchButton.innerHTML = `
+                    <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-light-button-text dark:border-dark-button-text"></div>
+                `;
+                searchButton.disabled = true;
+            }
+            [cityInput, submitCityButton, getLocationButton, queryInput, clearButton, forecastDaysInput, ...quickQueryButtons].forEach(el => el && (el.disabled = true));
+        }
+
+        function hideLoading() {
+            if (searchButton) {
+                searchButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                `;
+                searchButton.disabled = false;
+            }
+            [cityInput, submitCityButton, getLocationButton, queryInput, clearButton, forecastDaysInput, ...quickQueryButtons].forEach(el => el && (el.disabled = false));
+        }
+
+        function showFollowup() {
+            if (followupSection) {
+                followupSection.classList.remove('hidden');
+                followupInput?.focus();
+            }
+        }
+
         function loadMarked() {
-            if (markedLoaded) {
-                return Promise.resolve();
-            }
-            
-            if (markedLoadPromise) {
-                return markedLoadPromise;
-            }
-            
+            if (markedLoaded) { return Promise.resolve(); }
+            if (markedLoadPromise) { return markedLoadPromise; }
             markedLoadPromise = new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = '/static/marked.min.js';
                 script.onload = () => {
                     markedLoaded = true;
-                    // 配置 marked.js
-                    marked.use({
-                        gfm: true,
-                        breaks: true,
-                        pedantic: false,
-                        smartLists: true,
-                        smartypants: true
-                    });
-                    resolve();
+                    try {
+                        marked.use({ gfm: true, breaks: true });
+                        resolve();
+                    } catch (e) { console.error("Error configuring marked:", e); reject(e); }
                 };
                 script.onerror = reject;
                 document.body.appendChild(script);
             });
-            
             return markedLoadPromise;
         }
 
-        // 修改showResponse函数
         async function showResponse(markdownText, isLoading = false) {
-            const responseContainer = document.getElementById('response-container');
             if (!responseContainer) return;
-            
-            if (!responseContainer.style.display || responseContainer.style.display === 'none') {
-                responseContainer.style.display = 'block';
-                responseContainer.innerHTML = '';
+            responseContainer.style.display = 'block';
+
+            if (!markdownText && !isLoading) {
+                responseContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full p-8 text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-light-text-secondary dark:text-dark-text-secondary mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                        <h3 class="text-sm font-medium mb-1 text-light-text-primary dark:text-dark-text-primary">天气智能助手</h3>
+                        <p class="text-xs text-light-text-secondary dark:text-dark-text-secondary max-w-xs">
+                            输入您的位置和天气问题以获取精准分析
+                        </p>
+                    </div>
+                `;
+                return;
             }
 
-            if (!markdownText.trim()) {
+            if (isLoading && !responseContainer.innerHTML) {
+                showLoading();
+                return;
+            }
+
+            if (!markdownText.trim() && isLoading) {
                 return;
             }
 
             try {
-                // 确保marked.js已加载
                 await loadMarked();
-                
-                // 使用marked.parse渲染markdown
                 const html = marked.parse(markdownText);
-                responseContainer.innerHTML = html;
+                responseContainer.innerHTML = `<div class="markdown-content p-5">${html}</div>`;
+                responseContainer.classList.add('animate-fade');
                 
-                // 处理代码块
-                const codeBlocks = responseContainer.querySelectorAll('pre code');
-                if (codeBlocks.length > 0) {
-                    codeBlocks.forEach(block => {
-                        block.style.display = 'block';
-                        block.style.whiteSpace = 'pre-wrap';
-                        block.style.wordWrap = 'break-word';
-                    });
-                }
-                
-                // 处理引用块
-                const blockquotes = responseContainer.querySelectorAll('blockquote');
-                if (blockquotes.length > 0) {
-                    blockquotes.forEach(quote => {
-                        quote.style.borderLeft = '4px solid var(--primary-color)';
-                        quote.style.paddingLeft = '1rem';
-                        quote.style.margin = '1rem 0';
-                        quote.style.color = 'inherit';
-                    });
-                }
-
-                if (html.trim()) {
+                if (html.trim() && !isLoading) {
                     hideLoading();
                 }
-
-                const followupSection = document.getElementById('followupSection');
-                if (followupSection) {
-                    followupSection.style.display = 'block';
+                if (!isLoading && html.trim()) {
+                    showFollowup();
                 }
             } catch (error) {
                 console.error('Markdown 渲染错误:', error);
-                responseContainer.innerHTML = `<p>渲染错误: ${error.message}</p>`;
+                responseContainer.innerHTML = `<div class="p-5"><p class="text-red-600 dark:text-red-400">渲染错误: ${error.message}</p></div>`;
+                hideLoading();
             }
         }
 
-        function showLoading() {
-            const searchIcon = document.querySelector('.search-icon');
-            const container = document.querySelector('.container');
-            if (searchIcon) {
-                searchIcon.classList.add('loading');
-            }
-            if (container) {
-                container.classList.add('loading');
-            }
-        }
-
-        function hideLoading() {
-            const searchIcon = document.querySelector('.search-icon');
-            const container = document.querySelector('.container');
-            if (searchIcon) {
-                searchIcon.classList.remove('loading');
-            }
-            if (container) {
-                container.classList.remove('loading');
-            }
-        }
-
-        // 修改流式响应处理
-        async function handleStreamResponse(response, onContent, onReasoning) {
+        async function handleStreamResponse(response, onReasoning) {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let accumulatedResponse = '';
             let accumulatedReasoning = '';
             let isFirstChunk = true;
-            let modelType = document.querySelector('input[name="model"]:checked').value;
+            let modelType = document.querySelector('input[name="model"]:checked')?.value || 'gemini';
             
-            // 预加载marked.js
+            if (!responseContainer) return;
             try {
                 await loadMarked();
             } catch (error) {
                 console.error('加载marked.js失败:', error);
-                showResponse('加载Markdown渲染器失败，请刷新页面重试。');
+                showResponse('<p class="text-red-600 dark:text-red-400">加载Markdown渲染器失败，请刷新页面重试。</p>');
+                hideLoading();
                 return;
             }
+            
+            responseContainer.style.display = 'block';
+            responseContainer.innerHTML = '';
             
             try {
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-
-                    const chunk = decoder.decode(value);
-                    
+                    const chunk = decoder.decode(value, { stream: true });
                     const lines = chunk.split('\n');
-
                     for (const line of lines) {
                         if (!line.startsWith('data: ')) continue;
-                        
                         const data = line.slice(5).trim();
-                        if (data === '[DONE]') {
-                            hideLoading();
-                            showFollowup();
-                            continue;
-                        }
-
+                        if (data === '[DONE]') continue;
                         try {
                             const jsonData = JSON.parse(data);
-                            
                             if (jsonData.error) {
-                                showResponse(`错误: ${jsonData.error}`);
+                                showResponse(`<p class="text-red-600 dark:text-red-400">错误: ${jsonData.error}</p>`);
                                 hideLoading();
                                 return;
                             }
-
-                            // 处理开始信号
                             if (jsonData.start) {
                                 accumulatedResponse = '';
                                 isFirstChunk = true;
                                 continue;
                             }
-
-                            // 统一处理内容
                             if (jsonData.content) {
-                                const content = jsonData.content;
-
-                                // 如果是第一块内容，清空之前的累积
                                 if (isFirstChunk) {
                                     accumulatedResponse = '';
                                     isFirstChunk = false;
                                 }
-                                
-                                // 添加内容到累积响应
-                                accumulatedResponse += content;
-
-                                // 尝试渲染markdown
+                                accumulatedResponse += jsonData.content;
                                 try {
-                                    const html = marked.parse(accumulatedResponse);
-                                    const responseContainer = document.getElementById('response-container');
-                                    if (responseContainer) {
-                                        responseContainer.innerHTML = html;
-                                        responseContainer.style.display = 'block';
-                                        
-                                        // 统一处理样式
-                                        const codeBlocks = responseContainer.querySelectorAll('pre code');
-                                        codeBlocks.forEach(block => {
-                                            block.style.display = 'block';
-                                            block.style.whiteSpace = 'pre-wrap';
-                                            block.style.wordWrap = 'break-word';
-                                        });
-
-                                        const blockquotes = responseContainer.querySelectorAll('blockquote');
-                                        blockquotes.forEach(quote => {
-                                            quote.style.borderLeft = '4px solid var(--primary-color)';
-                                            quote.style.paddingLeft = '1rem';
-                                            quote.style.margin = '1rem 0';
-                                            quote.style.color = 'inherit';
-                                            quote.style.background = 'rgba(0, 0, 0, 0.03)';
-                                            quote.style.borderRadius = '0 8px 8px 0';
-                                            quote.style.padding = '1rem';
-                                        });
-                                    }
+                                    responseContainer.innerHTML = `<div class="markdown-content p-5">${marked.parse(accumulatedResponse)}</div>`;
                                 } catch (renderError) {
-                                    console.warn('渲染中间状态出错，继续累积内容:', renderError);
+                                    console.warn('渲染中间状态出错');
                                 }
                             }
-
-                            // 统一处理推理内容
                             if (jsonData.reasoning_content) {
                                 accumulatedReasoning += jsonData.reasoning_content;
                                 onReasoning(accumulatedReasoning);
                             }
                         } catch (e) {
-                            if (data !== '[DONE]') {
-                                console.error('解析数据出错:', e, 'data:', data);
-                            }
+                            if (data !== '[DONE]') console.error('解析数据出错:', e, 'data:', data);
                         }
                     }
                 }
             } catch (error) {
                 console.error('处理流式响应时出错:', error);
-                showResponse(`处理响应时出错: ${error.message}`);
+                showResponse(`<p class="text-red-600 dark:text-red-400">处理响应时出错: ${error.message}</p>`);
             } finally {
-                hideLoading();
-                
-                // 最后再渲染一次确保内容完整
                 if (accumulatedResponse) {
                     try {
-                        // 确保marked.js已加载
-                        await loadMarked();
-                        
-                        // 对于Gemini，尝试修复可能的Markdown格式问题
                         if (modelType === 'gemini') {
-                            // 确保代码块正确闭合
                             const codeBlockMatches = accumulatedResponse.match(/```/g);
                             if (codeBlockMatches && codeBlockMatches.length % 2 !== 0) {
                                 accumulatedResponse += '\n```';
                             }
-                            
-                            // 确保表格格式正确
-                            if (accumulatedResponse.includes('|') && !accumulatedResponse.includes('|-')) {
-                                accumulatedResponse = accumulatedResponse.replace(/\|([^|\n]+\|)+\n(?!\|[-:]+\|)/g, (match) => {
-                                    const columnCount = (match.match(/\|/g) || []).length - 1;
-                                    const separator = '\n|' + '---|'.repeat(columnCount) + '\n';
-                                    return match.replace('\n', separator);
-                                });
-                            }
                         }
-                        
-                        const html = marked.parse(accumulatedResponse);
-                        const responseContainer = document.getElementById('response-container');
-                        if (responseContainer) {
-                            responseContainer.innerHTML = html;
-                            responseContainer.style.display = 'block';
-                            
-                            // 最终样式处理
-                            const codeBlocks = responseContainer.querySelectorAll('pre code');
-                            codeBlocks.forEach(block => {
-                                block.style.display = 'block';
-                                block.style.whiteSpace = 'pre-wrap';
-                                block.style.wordWrap = 'break-word';
-                            });
-
-                            const blockquotes = responseContainer.querySelectorAll('blockquote');
-                            blockquotes.forEach(quote => {
-                                quote.style.borderLeft = '4px solid var(--primary-color)';
-                                quote.style.paddingLeft = '1rem';
-                                quote.style.margin = '1rem 0';
-                                quote.style.color = 'inherit';
-                                quote.style.background = 'rgba(0, 0, 0, 0.03)';
-                                quote.style.borderRadius = '0 8px 8px 0';
-                                quote.style.padding = '1rem';
-                            });
-                        }
+                        responseContainer.innerHTML = `<div class="markdown-content p-5">${marked.parse(accumulatedResponse)}</div>`;
                     } catch (finalRenderError) {
                         console.error('最终渲染错误:', finalRenderError);
-                        showResponse(`渲染错误: ${finalRenderError.message}`);
+                        responseContainer.innerHTML = `<div class="p-5"><p class="text-red-600 dark:text-red-400">最终渲染错误: ${finalRenderError.message}</p></div>`;
                     }
+                }
+                hideLoading();
+                if (accumulatedResponse.trim()) {
+                    showFollowup();
                 }
             }
         }
 
-        // 检查markdown是否完整
-        function isCompleteMarkdown(text) {
-            // 检查基本的markdown结构是否完整
-            const patterns = {
-                codeBlock: /```[\s\S]*?```/g,
-                blockquote: /^>[\s\S]*?\n\n/gm,
-                list: /^[-*+][\s\S]*?\n\n/gm,
-                heading: /^#{1,6}.*?\n/gm,
-                table: /\|.*\|.*\n\|[-:| ]*\|.*\n(\|.*\|.*\n)*/gm,
-            };
-
-            // 检查是否有未闭合的代码块
-            const codeBlockMatches = text.match(/```/g);
-            if (codeBlockMatches && codeBlockMatches.length % 2 !== 0) {
-                return false;
-            }
-
-            // 检查是否有未完成的句子（以标点符号结尾）
-            const lastChar = text.trim().slice(-1);
-            const completionChars = ['.', '。', '!', '！', '?', '？', '…', '"', "'", '」', '）', '】', '》', '；', ';'];
-            if (!completionChars.includes(lastChar)) {
-                return false;
-            }
-
-            return true;
-        }
-
-        // 修改getWeatherAIResponse函数
         async function getWeatherAIResponse(lat, lon, query, forecastDays) {
             try {
                 showLoading();
-                showResponse('', false); // 清空之前的响应
-                const modelType = document.querySelector('input[name="model"]:checked').value;
-                
+                showResponse('', true);
+                showReasoning('');
+                const modelType = document.querySelector('input[name="model"]:checked')?.value || 'gemini';
                 const response = await fetch('/get_weather_advice', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        latitude: lat,
-                        longitude: lon,
-                        query: query,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        latitude: lat, 
+                        longitude: lon, 
+                        query: query, 
                         forecast_days: forecastDays,
                         model_type: modelType
                     })
                 });
-
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-
-                // 处理流式响应
-                await handleStreamResponse(
-                    response,
-                    (content) => showResponse(content, true),
-                    (reasoning) => showReasoning(reasoning)
-                );
-
-                // 缓存天气数据
-                cachedWeatherData = {
-                    latitude: lat,
-                    longitude: lon,
-                    query: query,
-                    forecast_days: forecastDays
-                };
-
+                await handleStreamResponse(response, showReasoning);
+                cachedWeatherData = { latitude: lat, longitude: lon, query: query, forecast_days: forecastDays };
             } catch (error) {
                 console.error('获取天气建议失败:', error);
-                showResponse(`获取天气建议失败: ${error.message}`);
-            } finally {
+                showResponse(`<p class="text-red-600 dark:text-red-400">获取天气建议失败: ${error.message}</p>`);
                 hideLoading();
             }
         }
 
-        // 修改handleFollowup函数
         async function handleFollowup() {
-            const query = document.getElementById('followupInput').value.trim();
+            const query = followupInput?.value.trim();
             if (!query) {
-                showResponse("请输入追问内容。");
+                alert("请输入追问内容。");
                 return;
             }
             if (!cachedWeatherData) {
-                showResponse("请先进行天气查询。");
+                alert("请先进行天气查询。");
                 return;
             }
-            
             try {
                 showLoading();
-                showResponse('', false);
-                const modelType = document.querySelector('input[name="model"]:checked').value;
-                
+                showResponse('', true);
+                showReasoning('');
+                const modelType = document.querySelector('input[name="model"]:checked')?.value || 'gemini';
                 const response = await fetch('/ask_followup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        latitude: cachedWeatherData.latitude,
-                        longitude: cachedWeatherData.longitude,
-                        forecast_days: cachedWeatherData.forecast_days,
+                    body: JSON.stringify({ 
+                        latitude: cachedWeatherData.latitude, 
+                        longitude: cachedWeatherData.longitude, 
+                        forecast_days: cachedWeatherData.forecast_days, 
                         query: query,
                         model_type: modelType
                     })
                 });
-
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-
-                await handleStreamResponse(
-                    response,
-                    () => {}, // 空函数，因为渲染已经在 handleStreamResponse 中处理
-                    (reasoning) => showReasoning(reasoning)
-                );
+                await handleStreamResponse(response, showReasoning);
+                followupInput.value = '';
             } catch (error) {
                 console.error('追问请求失败:', error);
-                showResponse(`追问失败: ${error.message}`);
-            } finally {
+                showResponse(`<p class="text-red-600 dark:text-red-400">追问失败: ${error.message}</p>`);
                 hideLoading();
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const body = document.body;
-            const locationInfo = document.querySelector('.location-info');
-            const reacquireLocationButton = document.getElementById('reacquire-location');
-            const searchBar = document.querySelector('.search-bar');
-            const searchButton = document.getElementById('searchButton');
-            const responseContainer = document.getElementById('response-container');
-            const forecastDaysInput = document.getElementById('forecastDays');
-            const forecastDaysValueDisplay = document.getElementById('forecastDaysValue');
-            const exampleQueries = document.querySelectorAll('.example-query');
-
-            let latitude;
-            let longitude;
-
-            const THEMES = {
-                LIGHT: 'light',
-                DARK: 'dark'
-            };
-
-            const LOCATION_MESSAGES = {
-                LOADING: '正在获取位置信息...',
-                DENIED: '位置信息访问被拒绝，请手动输入城市',
-                ERROR: '无法获取您的位置信息，请手动输入城市',
-                UNSUPPORTED: '您的浏览器不支持地理位置功能，请手动输入城市'
-            };
-
-            function setTheme(theme) {
-                body.classList.toggle('dark-mode', theme === THEMES.DARK);
-                localStorage.setItem('theme', theme);
+        function showReasoning(content) {
+            if (!reasoningContainer || !reasoningContent) return;
+            if (content && content.trim()) {
+                reasoningContainer.style.display = 'block';
+                const lines = content.split('\n');
+                const maxLines = 6;
+                reasoningContent.textContent = lines.slice(-maxLines).join('\n');
+                reasoningContainer.scrollTop = reasoningContainer.scrollHeight;
+            } else {
+                reasoningContainer.style.display = 'none';
+                reasoningContent.textContent = '';
             }
+        }
 
-            // Apply Automatic Theme on Load
-            function applyAutomaticTheme() {
-                const hour = new Date().getHours();
-                const theme = (hour >= 19 || hour < 7) ? THEMES.DARK : THEMES.LIGHT;
-                setTheme(theme);
-            }
+        function updateSliderBackground(slider) {
+            if (!slider) return;
+            // We don't need to manipulate the background - the slider will work with our CSS above
+            // This function is now just for updating the text value
+        }
 
-            // Initialize theme (Apply saved or automatic theme)
-            const savedTheme = localStorage.getItem('theme');
-            savedTheme ? setTheme(savedTheme) : applyAutomaticTheme();
+        function initSlider() {
+            if (!forecastDaysInput || !forecastDaysValueDisplay) return;
+            forecastDaysValueDisplay.textContent = forecastDaysInput.value;
+            forecastDaysInput.addEventListener('input', () => {
+                forecastDaysValueDisplay.textContent = forecastDaysInput.value;
+                // Still call updateSliderBackground for potential future use
+                updateSliderBackground(forecastDaysInput);
+            });
+        }
 
-            // 每小时检查一次是否需要切换主题
-            setInterval(() => {
-                if (!localStorage.getItem('theme')) {  // 只有在没有手动设置主题时才自动切换
-                    applyAutomaticTheme();
-                }
-            }, 3600000); // 每小时检查一次
-
-            let cachedLocation = {};
-            let cachedForecastDays = 5;
-
-            function getLocation() {
-                locationInfo.textContent = LOCATION_MESSAGES.LOADING;
-                if (navigator.geolocation) {
-                    const geolocationOptions = {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
-                    };
-
-                    navigator.geolocation.getCurrentPosition(
-                        // Success callback
-                        (position) => {
-                            latitude = position.coords.latitude;
-                            longitude = position.coords.longitude;
-                            locationInfo.textContent = `您的位置： ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-                            currentLat = latitude;
-                            currentLon = longitude;
-                        },
-                        // Error callback
-                        (error) => {
-                            console.error('地理位置错误:', error);
-                            locationInfo.textContent = {
-                                [GeolocationPositionError.PERMISSION_DENIED]: LOCATION_MESSAGES.DENIED,
-                                [GeolocationPositionError.TIMEOUT]: LOCATION_MESSAGES.ERROR,
-                                [GeolocationPositionError.POSITION_UNAVAILABLE]: LOCATION_MESSAGES.ERROR,
-                            }[error.code] || LOCATION_MESSAGES.ERROR;
-                            showManualLocationInput();
-                        },
-                        geolocationOptions
-                    );
-                } else {
-                    locationInfo.textContent = LOCATION_MESSAGES.UNSUPPORTED;
-                    showManualLocationInput();
-                }
-            }
-
-            function handleSearch() {
-                const query = document.getElementById('queryInput').value.trim();
+        function setupEventListeners() {
+            submitCityButton?.addEventListener('click', handleCitySubmit);
+            cityInput?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleCitySubmit();
+            });
+            getLocationButton?.addEventListener('click', getLocation);
+            searchButton?.addEventListener('click', () => {
+                const query = queryInput?.value.trim();
                 if (!query) {
-                    showResponse("请输入一个问题。");
+                    alert("请输入一个问题。");
                     return;
                 }
-                if (typeof latitude === 'undefined' || typeof longitude === 'undefined') {
-                    showResponse("位置信息尚未可用，请稍候。");
+                if (typeof currentLat === 'undefined' || typeof currentLon === 'undefined') {
+                    alert("位置信息尚未确定，请先获取位置或输入城市。");
                     return;
                 }
-                // 缓存位置和预测天数 (Cache location and forecast days)
-                cachedLocation = { latitude, longitude };
-                cachedForecastDays = parseInt(forecastDaysInput.value);
-                getWeatherAIResponse(latitude, longitude, query, cachedForecastDays);
-            }
-
-            // Event Listeners
-            searchButton.addEventListener('click', handleSearch); // Attach to search button
-            searchBar.addEventListener('keypress', (event) => {
-                if (event.key === 'Enter') handleSearch();
+                const forecastDays = parseInt(forecastDaysInput?.value || '5');
+                getWeatherAIResponse(currentLat, currentLon, query, forecastDays);
             });
-            document.getElementById('getLocationBtn').addEventListener('click', () => {
-                // Clear any existing location info
-                locationInfo.textContent = LOCATION_MESSAGES.LOADING;
-                // Reset the location values
-                latitude = undefined;
-                longitude = undefined;
-                // Start the location process again
-                getLocation();
+            queryInput?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const query = queryInput?.value.trim();
+                    if (!query) {
+                        alert("请输入一个问题。");
+                        return;
+                    }
+                    if (typeof currentLat === 'undefined' || typeof currentLon === 'undefined') {
+                        alert("位置信息尚未确定，请先获取位置或输入城市。");
+                        return;
+                    }
+                    const forecastDays = parseInt(forecastDaysInput?.value || '5');
+                    getWeatherAIResponse(currentLat, currentLon, query, forecastDays);
+                }
             });
-
-            // Example queries event listeners (Updated)
-            exampleQueries.forEach(queryElement => {
-                queryElement.addEventListener('click', function () {
-                    searchBar.value = this.dataset.query;
-                    searchBar.focus();
+            queryInput?.addEventListener('input', () => {
+                clearButton?.classList.toggle('visible', queryInput.value.length > 0);
+            });
+            clearButton?.addEventListener('click', () => {
+                if (queryInput) queryInput.value = '';
+                clearButton.classList.remove('visible');
+                queryInput?.focus();
+            });
+            quickQueryButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    if (queryInput) {
+                        queryInput.value = this.dataset.query || '';
+                        queryInput.focus();
+                    }
                     const days = this.dataset.days;
-                    if (days) {
+                    if (days && forecastDaysInput && forecastDaysValueDisplay) {
                         forecastDaysInput.value = days;
                         forecastDaysValueDisplay.textContent = days;
                         updateSliderBackground(forecastDaysInput);
                     }
-                    // 只有在有内容时才显示清除按钮
-                    clearButton.classList.toggle('visible', searchBar.value.length > 0);
                 });
             });
-
-            // Forecast days slider (Slider functionality with visual update)
-            function updateSliderBackground(slider) {
-                const value = (slider.value - slider.min) / (slider.max - slider.min) * 100;
-                slider.style.background = `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${value}%, #d3d3d3 ${value}%, #d3d3d3 100%)`;
-            }
-
-            forecastDaysInput.addEventListener('input', () => {
-                forecastDaysValueDisplay.textContent = forecastDaysInput.value;
-                updateSliderBackground(forecastDaysInput); // Update slider background on input
-            });
-            updateSliderBackground(forecastDaysInput); // Initial slider background update
-
-            // Add keyboard navigation
-            document.addEventListener('keydown', (e) => {
-                if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
-                    e.preventDefault();
-                    searchBar.focus();
-                }
-            });
-
-            // Add error boundary
-            window.onerror = function (msg, url, lineNo, columnNo, error) {
-                console.error('Global error:', { msg, url, lineNo, columnNo, error });
-                showResponse('应用程序发生错误，请刷新页面重试。');
-                return false;
-            };
-
-            // Add analytics event tracking (optional - replace with your analytics code)
-            const trackEvent = (eventName, eventData) => {
-                if (window.gtag) {
-                    gtag('event', eventName, eventData);
-                }
-            };
-
-            // Add accessibility improvements
-            const improveAccessibility = () => {
-                // Add ARIA labels - already in place, can add more if needed
-            };
-
-            improveAccessibility();
-
-            // Lazy load response container (Intersection Observer)
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.style.opacity = '1'; // Or any other lazy load effect
-                        observer.unobserve(entry.target); // Optionally unobserve after loading
-                    }
-                });
-            });
-
-            if (responseContainer) {
-                responseContainer.style.opacity = '0'; // Initially hide or style for lazy load
-                observer.observe(responseContainer);
-            }
-
-            // Prefers reduced motion
-            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                document.documentElement.style.setProperty('--transition-speed', '0s');
-            }
-
-            // Add this to your existing JavaScript
-            const searchInput = document.getElementById('queryInput');
-            const clearButton = document.getElementById('clearSearch');
-
-            // Show/hide clear button based on input content
-            searchInput.addEventListener('input', () => {
-                clearButton.classList.toggle('visible', searchInput.value.length > 0);
-            });
-
-            // Clear input when clear button is clicked
-            clearButton.addEventListener('click', () => {
-                searchInput.value = '';
-                clearButton.classList.remove('visible');
-                searchInput.focus();
-            });
-
-            // 确保页面加载时清除按钮是隐藏的
-            document.addEventListener('DOMContentLoaded', () => {
-                clearButton.classList.remove('visible');
-            });
-
-            // 添加手动位置输入相关函数
-            function showManualLocationInput() {
-                const container = document.getElementById('manualLocationContainer');
-                if (container) {
-                    container.style.display = 'flex';
-                }
-            }
-
-            function hideManualLocationInput() {
-                const container = document.getElementById('manualLocationContainer');
-                if (container) {
-                    container.style.display = 'none';
-                }
-            }
-
-            // 修改handleCitySubmit函数
-            async function handleCitySubmit() {
-                const cityInput = document.getElementById('cityInput');
-                const city = cityInput.value.trim();
-                
-                if (!city) {
-                    locationInfo.textContent = '请输入城市名称';
-                    return;
-                }
-
-                try {
-                    showLoading();
-                    locationInfo.textContent = '正在获取城市位置信息...';
-                    const response = await fetch('/get_city_location', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ city: city })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    if (data.error) {
-                        throw new Error(data.error);
-                    }
-
-                    latitude = parseFloat(data.latitude);
-                    longitude = parseFloat(data.longitude);
-                    currentLat = latitude;
-                    currentLon = longitude;
-                    
-                    locationInfo.textContent = `您的位置： ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (${city})`;
-                    cityInput.value = ''; // 清空输入框，方便下次输入
-                } catch (error) {
-                    console.error('获取城市位置失败:', error);
-                    locationInfo.textContent = `无法获取城市"${city}"的位置信息，请重试或输入其他城市`;
-                } finally {
-                    hideLoading();
-                }
-            }
-
-            // 添加城市提交相关的事件监听
-            document.getElementById('submitCity').addEventListener('click', handleCitySubmit);
-            document.getElementById('cityInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') handleCitySubmit();
-            });
-            document.getElementById('getLocationBtn').addEventListener('click', getLocation);
-
-            // 绑定追问按钮事件 (Bind followup button event)
-            document.getElementById('submitFollowup').addEventListener('click', handleFollowup);
-            document.getElementById('followupInput').addEventListener('keypress', (e) => {
+            submitFollowupButton?.addEventListener('click', handleFollowup);
+            followupInput?.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') handleFollowup();
             });
-
-            // 添加标题和logo的点击事件监听器
-            const headerSection = document.getElementById('headerSection');
-            const logoIcon = document.getElementById('logoIcon');
-            const appTitle = document.getElementById('appTitle');
-
-            function refreshPage() {
-                window.location.reload();
-            }
-
-            // 为整个header区域添加可点击的样式
-            headerSection.style.cursor = 'pointer';
-            logoIcon.style.cursor = 'pointer';
-            appTitle.style.cursor = 'pointer';
-
-            // 添加点击事件监听器
-            headerSection.addEventListener('click', refreshPage);
-            logoIcon.addEventListener('click', refreshPage);
-            appTitle.addEventListener('click', refreshPage);
-        });
-
-        function showReasoning(content) {
-            const reasoningContainer = document.getElementById('reasoning-container');
-            const reasoningContent = reasoningContainer.querySelector('.reasoning-content');
-            
-            if (content) {
-                reasoningContainer.style.display = 'block';
-                
-                // 保持最后6行，增加显示内容
-                const lines = content.split('\n');
-                if (lines.length > 6) {
-                    reasoningContent.textContent = lines.slice(-6).join('\n');
-                } else {
-                    reasoningContent.textContent = content;
-                }
-
-                // 取消之前的动画
-                if (reasoningContainer.scrollTimeout) {
-                    clearTimeout(reasoningContainer.scrollTimeout);
-                }
-                if (reasoningContainer.animationFrameId) {
-                    cancelAnimationFrame(reasoningContainer.animationFrameId);
-                }
-
-                // 使用 requestAnimationFrame 实现平滑滚动
-                const animate = () => {
-                    const currentScroll = reasoningContainer.scrollTop;
-                    const lineHeight = parseInt(getComputedStyle(reasoningContent).lineHeight);
-                    const containerHeight = reasoningContainer.clientHeight;
-                    const contentHeight = reasoningContent.scrollHeight;
-                    
-                    // 动态调整缓冲区大小，基于内容长度
-                    const bufferSize = Math.min(
-                        lineHeight * 2,
-                        (contentHeight - containerHeight) * 0.2
-                    );
-                    
-                    const targetScroll = contentHeight - containerHeight - bufferSize;
-                    
-                    if (targetScroll > currentScroll) {
-                        // 动态调整滚动速度，基于剩余滚动距离
-                        const remainingDistance = targetScroll - currentScroll;
-                        const speedFactor = Math.min(0.2, remainingDistance / contentHeight);
-                        const scrollStep = Math.max(
-                            1,
-                            remainingDistance * speedFactor
-                        );
-                        
-                        const maxStep = lineHeight * 0.8;
-                        const actualStep = Math.min(scrollStep, maxStep);
-                        
-                        reasoningContainer.scrollTop = currentScroll + actualStep;
-                        
-                        if (Math.abs(targetScroll - (currentScroll + actualStep)) > 1) {
-                            reasoningContainer.scrollTimeout = setTimeout(() => {
-                                reasoningContainer.animationFrameId = requestAnimationFrame(animate);
-                            }, 25); // 降低更新频率，减少性能压力
-                        }
-                    }
-                };
-
-                // 启动动画
-                reasoningContainer.animationFrameId = requestAnimationFrame(animate);
-            } else {
-                reasoningContainer.style.display = 'none';
-            }
+            headerSection?.addEventListener('click', () => window.location.reload());
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSlider();
+            setupEventListeners();
+            getLocation();
+            window.onerror = function(msg, url, lineNo, columnNo, error) {
+                console.error('Global error:', { msg, url, lineNo, columnNo, error });
+                showResponse('<p class="text-red-600 dark:text-red-400">应用程序发生错误，请刷新页面重试。</p>');
+                return false;
+            };
+        });
     </script>
 </body>
-
 </html>
